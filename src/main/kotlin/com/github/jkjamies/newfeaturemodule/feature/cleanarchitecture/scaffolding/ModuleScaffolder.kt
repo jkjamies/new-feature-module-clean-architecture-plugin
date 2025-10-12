@@ -4,10 +4,15 @@ import com.github.jkjamies.newfeaturemodule.feature.cleanarchitecture.util.FileU
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 
-/** Creates per-module folder structure and minimal files. */
+/**
+ * Creates the basic Gradle and source structure for a single feature submodule.
+ */
 class ModuleScaffolder {
+    /**
+     * Ensures Gradle build file and source directories exist under [moduleDir] and writes
+     * a simple placeholder Kotlin file in package `com.jkjamies.[rootName].[featureName].[moduleName]`.
+     */
     fun scaffoldModule(moduleDir: VirtualFile, moduleName: String, rootName: String, featureName: String) {
-        // build.gradle.kts
         val buildText = """
             plugins {
                 `java-library`
@@ -27,13 +32,12 @@ class ModuleScaffolder {
                 google()
             }
             
-            // Add your module-specific dependencies here
             dependencies {
             }
         """.trimIndent()
+        // avoid overwriting if user customized later
         FileUtilExt.writeFileIfAbsent(moduleDir, "build.gradle.kts", buildText)
 
-        // Kotlin source sets
         val srcMainKotlin = VfsUtil.createDirectories(moduleDir.path + "/src/main/kotlin")
         val srcMainResources = VfsUtil.createDirectories(moduleDir.path + "/src/main/resources")
         val srcTestKotlin = VfsUtil.createDirectories(moduleDir.path + "/src/test/kotlin")
@@ -47,8 +51,10 @@ class ModuleScaffolder {
             
             class Placeholder
         """.trimIndent()
+        // convert dotted package to folder path
         val pkgDirPath = srcMainKotlin.path + "/" + packageName.replace('.', '/')
         val pkgDir = VfsUtil.createDirectories(pkgDirPath)
+        // create only if missing
         FileUtilExt.writeFileIfAbsent(pkgDir, "Placeholder.kt", placeholder)
     }
 }

@@ -9,10 +9,20 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 
 /**
- * Tools -> Generate Clean Architecture Modules
- * Delegates actual work to generator components for clarity and growth.
+ * Action entry point that opens [GenerateModulesDialog] and scaffolds feature modules.
+ *
+ * The action is registered in plugin.xml and appears in the Tools menu. It collects
+ * user input, validates project base path from [Project.basePath], then performs all
+ * file-system updates inside a write command via [WriteCommandAction].
  */
 class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modules") {
+    /**
+     * Handles the user invocation from the IDE UI with the given [AnActionEvent].
+     *
+     * - Acquires the [Project] from [AnActionEvent.project].
+     * - Shows [GenerateModulesDialog].
+     * - Delegates generation to [FeatureModulesGenerator.generate].
+     */
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project = e.project ?: return
 

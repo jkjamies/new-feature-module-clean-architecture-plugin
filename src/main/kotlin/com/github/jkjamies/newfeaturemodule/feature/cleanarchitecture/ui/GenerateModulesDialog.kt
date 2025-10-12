@@ -11,20 +11,29 @@ import java.awt.GridBagLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
 
-/** Simple dialog to collect root folder and feature name. */
+/**
+ * Dialog used by the action to capture the root features folder and the feature name.
+ *
+ * Instances are created with a [Project] and presented via [DialogWrapper.showAndGet].
+ * The text fields are simple [JBTextField] components sized for typical names.
+ */
 class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     private val rootField = JBTextField("features")
     private val featureField = JBTextField()
 
     init {
         title = "Generate Clean Architecture Modules"
-        // Widen input boxes a bit by increasing preferred column count
         rootField.columns = 28
         featureField.columns = 28
         init()
     }
 
-    override fun createCenterPanel(): JComponent {
+    /**
+     * Builds the form content for the dialog using a small grid layout.
+     *
+     * @return a Swing [JComponent] containing two labeled [JBTextField] inputs
+     */
+    protected override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout())
         panel.border = JBUI.Borders.empty(12)
 
@@ -34,21 +43,17 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             insets = JBUI.insets(8, 12)
         }
 
-        // Root label
         gc.gridx = 0; gc.gridy = 0
         form.add(JBLabel("Root folder under project (e.g., features):"), gc)
-        // Root input
         gc.gridx = 1
         gc.fill = GridBagConstraints.HORIZONTAL
         gc.weightx = 1.0
         form.add(rootField, gc)
 
-        // Feature label
         gc.gridx = 0; gc.gridy = 1
         gc.weightx = 0.0
         gc.fill = GridBagConstraints.NONE
         form.add(JBLabel("Feature name (e.g., payments):"), gc)
-        // Feature input
         gc.gridx = 1
         gc.fill = GridBagConstraints.HORIZONTAL
         gc.weightx = 1.0
@@ -58,5 +63,8 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         return panel
     }
 
+    /**
+     * Returns the trimmed root and feature values as a [Pair].
+     */
     fun getValues(): Pair<String, String> = rootField.text.trim() to featureField.text.trim()
 }

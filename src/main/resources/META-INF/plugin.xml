@@ -5,8 +5,6 @@
 
     <depends>com.intellij.modules.platform</depends>
 
-    <resource-bundle>messages.MyBundle</resource-bundle>
-
     <actions>
         <group id="com.github.jkjamies.newfeaturemodule.actions.CleanArchitectureGroup"
                text="Clean Architecture"
