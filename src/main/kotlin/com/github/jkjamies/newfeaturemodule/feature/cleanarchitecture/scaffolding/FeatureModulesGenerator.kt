@@ -10,7 +10,7 @@ import com.intellij.openapi.vfs.VfsUtil
  *
  * This class delegates to [ModuleScaffolder] for file layout and to [SettingsUpdater]
  * for updating settings.gradle(.kts). It relies on the IntelliJ VFS ([LocalFileSystem], [VfsUtil])
- * and should be called from a write context.
+ * and should be called from a writing context.
  */
 class FeatureModulesGenerator(private val project: Project) {
     private val moduleScaffolder = ModuleScaffolder()

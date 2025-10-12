@@ -6,7 +6,7 @@ import com.intellij.testFramework.LightPlatformTestCase
 import java.nio.file.Files
 
 /**
- * End-to-end tests for [FeatureModulesGenerator] integrating with VFS ([LocalFileSystem], [VfsUtil]).
+ * End-to-end tests for [FeatureModulesGenerator] integrating with VFS (LocalFileSystem, VfsUtil).
  */
 class FeatureModulesGeneratorTests : LightPlatformTestCase() {
     fun testGenerateCreatesModulesAndUpdatesSettings() {

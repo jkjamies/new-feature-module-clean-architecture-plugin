@@ -6,7 +6,7 @@ import com.intellij.testFramework.LightPlatformTestCase
 import java.nio.file.Files
 
 /**
- * Verifies [ModuleScaffolder] creates expected directories and files via [VfsUtil].
+ * Verifies [ModuleScaffolder] creates expected directories and files via VfsUtil.
  */
 class ModuleScaffolderTests : LightPlatformTestCase() {
     fun testScaffoldCreatesExpectedStructure() {
