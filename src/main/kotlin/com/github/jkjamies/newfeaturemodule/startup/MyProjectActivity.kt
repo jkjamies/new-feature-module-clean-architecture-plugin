@@ -1,4 +1,4 @@
-package com.github.jkjamies.newfeaturemodulecleanarchitectureplugin.startup
+package com.github.jkjamies.newfeaturemodule.startup
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project

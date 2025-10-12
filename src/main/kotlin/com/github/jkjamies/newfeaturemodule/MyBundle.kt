@@ -1,4 +1,4 @@
-package com.github.jkjamies.newfeaturemodulecleanarchitectureplugin
+package com.github.jkjamies.newfeaturemodule
 
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.NonNls
