@@ -119,30 +119,38 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
         val includeDiMethod = dialog.javaClass.getMethod("getIncludeDi")
         assertTrue(includeDiMethod.invoke(dialog) as Boolean)
 
-        // Access DI options panel and checkboxes via reflection
+        // Access DI options panel and radio buttons via reflection
         val diPanelField = dialog.javaClass.getDeclaredField("diOptionsPanel").apply { isAccessible = true }
         val diPanel = diPanelField.get(dialog) as java.awt.Component
         assertTrue(diPanel.isVisible)
 
-        val hiltField = dialog.javaClass.getDeclaredField("diHiltCheckBox").apply { isAccessible = true }
-        val koinField = dialog.javaClass.getDeclaredField("diKoinCheckBox").apply { isAccessible = true }
-        val hilt = hiltField.get(dialog) as com.intellij.ui.components.JBCheckBox
-        val koin = koinField.get(dialog) as com.intellij.ui.components.JBCheckBox
+        val hiltField = dialog.javaClass.getDeclaredField("diHiltRadioButton").apply { isAccessible = true }
+        val koinField = dialog.javaClass.getDeclaredField("diKoinRadioButton").apply { isAccessible = true }
+        val koinAnnotationsField = dialog.javaClass.getDeclaredField("koinAnnotationsCheckBox").apply { isAccessible = true }
+        val hilt = hiltField.get(dialog) as com.intellij.ui.components.JBRadioButton
+        val koin = koinField.get(dialog) as com.intellij.ui.components.JBRadioButton
+        val koinAnnotations = koinAnnotationsField.get(dialog) as com.intellij.ui.components.JBCheckBox
 
-        // Defaults when enabled: Hilt selected, Koin not; selected one disabled to prevent deselecting last choice
+        // Defaults when enabled: Hilt selected, Koin not; with radio buttons both remain enabled
         assertTrue(hilt.isSelected)
         assertFalse(koin.isSelected)
-        assertFalse(hilt.isEnabled)
+        assertTrue(hilt.isEnabled)
         assertTrue(koin.isEnabled)
+        // Koin annotations should be hidden and disabled by default (since Hilt is selected)
+        assertFalse(koinAnnotations.isVisible)
+        assertFalse(koinAnnotations.isEnabled)
+        assertFalse(koinAnnotations.isSelected)
 
-        // Selecting Koin should unselect Hilt; Koin becomes disabled, Hilt enabled
+        // Selecting Koin should unselect Hilt; both remain enabled; Koin annotations should appear and be enabled
         koin.isSelected = true
         assertTrue(koin.isSelected)
         assertFalse(hilt.isSelected)
-        assertFalse(koin.isEnabled)
+        assertTrue(koin.isEnabled)
         assertTrue(hilt.isEnabled)
+        assertTrue(koinAnnotations.isVisible)
+        assertTrue(koinAnnotations.isEnabled)
 
-        // Disable Include DI: both options become unselected and disabled
+        // Disable Include DI: both options become unselected and disabled, and Koin annotations hidden and cleared
         val includeDiField = dialog.javaClass.getDeclaredField("includeDiCheckBox").apply { isAccessible = true }
         val includeDiCheckbox = includeDiField.get(dialog) as com.intellij.ui.components.JBCheckBox
         includeDiCheckbox.isSelected = false
@@ -150,12 +158,62 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
         assertFalse(koin.isSelected)
         assertFalse(hilt.isEnabled)
         assertFalse(koin.isEnabled)
+        assertFalse(koinAnnotations.isVisible)
+        assertFalse(koinAnnotations.isEnabled)
+        assertFalse(koinAnnotations.isSelected)
 
-        // Re-enable Include DI: default should select Hilt again and enforce single selection
+        // Re-enable Include DI: default should select Hilt again and both radios stay enabled; Koin annotations remains hidden
         includeDiCheckbox.isSelected = true
         assertTrue(hilt.isSelected)
         assertFalse(koin.isSelected)
+        assertTrue(hilt.isEnabled)
+        assertTrue(koin.isEnabled)
+        assertFalse(koinAnnotations.isVisible)
+        assertFalse(koinAnnotations.isEnabled)
+        assertFalse(koinAnnotations.isSelected)
+
+        // Switch to Koin again -> annotations visible and enabled
+        koin.isSelected = true
+        assertTrue(koinAnnotations.isVisible)
+        assertTrue(koinAnnotations.isEnabled)
+    }
+    fun testPlatformSectionAndKmpDiConstraint() {
+        val dialog = GenerateModulesDialog(project)
+
+        // Access platform radios
+        val androidField = dialog.javaClass.getDeclaredField("platformAndroidRadioButton").apply { isAccessible = true }
+        val kmpField = dialog.javaClass.getDeclaredField("platformKmpRadioButton").apply { isAccessible = true }
+        val android = androidField.get(dialog) as com.intellij.ui.components.JBRadioButton
+        val kmp = kmpField.get(dialog) as com.intellij.ui.components.JBRadioButton
+
+        // Access DI radios
+        val hiltField = dialog.javaClass.getDeclaredField("diHiltRadioButton").apply { isAccessible = true }
+        val koinField = dialog.javaClass.getDeclaredField("diKoinRadioButton").apply { isAccessible = true }
+        val hilt = hiltField.get(dialog) as com.intellij.ui.components.JBRadioButton
+        val koin = koinField.get(dialog) as com.intellij.ui.components.JBRadioButton
+
+        // Defaults: Android selected, DI enabled, Hilt selected and both enabled
+        assertTrue(android.isSelected)
+        assertFalse(kmp.isSelected)
+        assertTrue(hilt.isSelected)
+        assertFalse(koin.isSelected)
+        assertTrue(hilt.isEnabled)
+        assertTrue(koin.isEnabled)
+
+        // Select KMP -> Hilt must be disabled and unselected; Koin must be selected and enabled
+        kmp.isSelected = true
+        assertTrue(kmp.isSelected)
+        assertFalse(android.isSelected)
+        assertFalse(hilt.isSelected)
+        assertTrue(koin.isSelected)
         assertFalse(hilt.isEnabled)
+        assertTrue(koin.isEnabled)
+
+        // Switch back to Android -> Hilt becomes enabled again (selection may remain Koin)
+        android.isSelected = true
+        assertTrue(android.isSelected)
+        assertFalse(kmp.isSelected)
+        assertTrue(hilt.isEnabled)
         assertTrue(koin.isEnabled)
     }
 }

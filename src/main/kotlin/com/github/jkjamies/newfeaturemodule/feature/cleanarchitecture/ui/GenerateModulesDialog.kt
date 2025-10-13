@@ -5,11 +5,13 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextField
+import com.intellij.ui.components.JBRadioButton
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.event.ItemEvent
+import javax.swing.ButtonGroup
 import javax.swing.JComponent
 import javax.swing.JPanel
 
@@ -22,6 +24,21 @@ import javax.swing.JPanel
 class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     private val rootField = JBTextField()
     private val featureField = JBTextField()
+
+    // Platform section controls
+    private val platformAndroidRadioButton = JBRadioButton("Android", true)
+    private val platformKmpRadioButton = JBRadioButton("Kotlin Multiplatform (KMP)", false)
+    private val platformButtonGroup = ButtonGroup().apply {
+        add(platformAndroidRadioButton)
+        add(platformKmpRadioButton)
+    }
+    private val platformOptionsPanel = JPanel().apply {
+        add(platformAndroidRadioButton)
+        add(platformKmpRadioButton)
+        isVisible = true
+    }
+
+    // Presentation section controls
     private val includePresentationCheckBox = JBCheckBox("Include presentation module", true)
 
     // Data section controls
@@ -40,11 +57,17 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
 
     // Dependency Injection section controls
     private val includeDiCheckBox = JBCheckBox("Include dependency injection module", true)
-    private val diHiltCheckBox = JBCheckBox("Hilt", true)
-    private val diKoinCheckBox = JBCheckBox("Koin", false)
+    private val diHiltRadioButton = JBRadioButton("Hilt", true)
+    private val diKoinRadioButton = JBRadioButton("Koin", false)
+    private val diButtonGroup = ButtonGroup().apply {
+        add(diHiltRadioButton)
+        add(diKoinRadioButton)
+    }
+    private val koinAnnotationsCheckBox = JBCheckBox("Koin Annotations", false)
     private val diOptionsPanel = JPanel().apply {
-        add(diHiltCheckBox)
-        add(diKoinCheckBox)
+        add(diHiltRadioButton)
+        add(diKoinRadioButton)
+        add(koinAnnotationsCheckBox)
         isVisible = true
     }
 
@@ -154,67 +177,73 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
                 // Clear selections and disable both when DI not included
                 adjustingDiSelections = true
                 try {
-                    diHiltCheckBox.isSelected = false
-                    diKoinCheckBox.isSelected = false
+                    // Explicitly clear both before clearing the group to avoid any retained selection state
+                    diHiltRadioButton.isSelected = false
+                    diKoinRadioButton.isSelected = false
+                    diButtonGroup.clearSelection()
                 } finally {
                     adjustingDiSelections = false
                 }
-                diHiltCheckBox.isEnabled = false
-                diKoinCheckBox.isEnabled = false
+                diHiltRadioButton.isEnabled = false
+                diKoinRadioButton.isEnabled = false
+                // Hide and clear Koin annotations when DI is disabled
+                koinAnnotationsCheckBox.isSelected = false
+                koinAnnotationsCheckBox.isEnabled = false
+                koinAnnotationsCheckBox.isVisible = false
                 return
             }
-            // Ensure single-selection; default to Hilt if neither selected
-            if (!diHiltCheckBox.isSelected && !diKoinCheckBox.isSelected) {
+
+            val isKmp = platformKmpRadioButton.isSelected
+
+            if (isKmp) {
+                // On KMP platform, only Koin is allowed
                 adjustingDiSelections = true
                 try {
-                    diHiltCheckBox.isSelected = true
+                    diButtonGroup.clearSelection()
+                    diKoinRadioButton.isSelected = true
+                    diHiltRadioButton.isSelected = false
                 } finally {
                     adjustingDiSelections = false
                 }
-            }
-            // Enforce mutual exclusivity
-            if (diHiltCheckBox.isSelected && diKoinCheckBox.isSelected) {
-                // prefer the one that triggered, but here just keep Hilt and clear Koin
-                adjustingDiSelections = true
-                try {
-                    diKoinCheckBox.isSelected = false
-                } finally {
-                    adjustingDiSelections = false
+                diHiltRadioButton.isEnabled = false
+                diKoinRadioButton.isEnabled = true
+            } else {
+                // Android platform: if neither selected, default to Hilt selection explicitly
+                if (!diHiltRadioButton.isSelected && !diKoinRadioButton.isSelected) {
+                    adjustingDiSelections = true
+                    try {
+                        diButtonGroup.clearSelection()
+                        diHiltRadioButton.isSelected = true
+                        diKoinRadioButton.isSelected = false
+                    } finally {
+                        adjustingDiSelections = false
+                    }
                 }
+                // With radio buttons, mutual exclusivity is handled by ButtonGroup; both remain enabled
+                diHiltRadioButton.isEnabled = true
+                diKoinRadioButton.isEnabled = true
             }
-            // When exactly one selected, disable the selected one so user can't unselect the last option
-            val hiltSelected = diHiltCheckBox.isSelected
-            val koinSelected = diKoinCheckBox.isSelected
-            val exactlyOne = hiltSelected.xor(koinSelected)
-            diHiltCheckBox.isEnabled = !exactlyOne || !hiltSelected
-            diKoinCheckBox.isEnabled = !exactlyOne || !koinSelected
+
+            // Koin Annotations checkbox is only relevant when Koin is selected
+            val koinSelected = diKoinRadioButton.isSelected
+            koinAnnotationsCheckBox.isVisible = koinSelected
+            koinAnnotationsCheckBox.isEnabled = koinSelected
+            if (!koinSelected) {
+                koinAnnotationsCheckBox.isSelected = false
+            }
         }
 
         includeDiCheckBox.addItemListener { updateDiStates() }
-        diHiltCheckBox.addItemListener { e ->
+        diHiltRadioButton.addItemListener { e ->
             if (adjustingDiSelections) return@addItemListener
-            if ((e as ItemEvent).stateChange == ItemEvent.SELECTED) {
-                adjustingDiSelections = true
-                try {
-                    diKoinCheckBox.isSelected = false
-                } finally {
-                    adjustingDiSelections = false
-                }
-            }
-            updateDiStates()
+            if (e.stateChange == ItemEvent.SELECTED) updateDiStates()
         }
-        diKoinCheckBox.addItemListener { e ->
+        diKoinRadioButton.addItemListener { e ->
             if (adjustingDiSelections) return@addItemListener
-            if ((e as java.awt.event.ItemEvent).stateChange == ItemEvent.SELECTED) {
-                adjustingDiSelections = true
-                try {
-                    diHiltCheckBox.isSelected = false
-                } finally {
-                    adjustingDiSelections = false
-                }
-            }
-            updateDiStates()
+            if (e.stateChange == ItemEvent.SELECTED) updateDiStates()
         }
+        platformAndroidRadioButton.addItemListener { e -> if (e.stateChange == ItemEvent.SELECTED) updateDiStates() }
+        platformKmpRadioButton.addItemListener { e -> if (e.stateChange == ItemEvent.SELECTED) updateDiStates() }
 
         // initialize visibility/enabled states on dialog creation
         updateDatasourceStates()
@@ -254,32 +283,39 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         gc.weightx = 1.0
         form.add(featureField, gc)
 
-        // Data section label
+        // Platform section label
         gc.gridx = 0; gc.gridy = 2
+        form.add(JBLabel("Platform:"), gc)
+        // Platform options panel (Android / KMP)
+        gc.gridx = 1; gc.gridy = 2
+        form.add(platformOptionsPanel, gc)
+
+        // Data section label
+        gc.gridx = 0; gc.gridy = 3
         form.add(JBLabel("Data:"), gc)
         // Include datasource checkbox
-        gc.gridx = 1; gc.gridy = 2
+        gc.gridx = 1; gc.gridy = 3
         form.add(includeDatasourceCheckBox, gc)
 
         // Datasource options panel (always visible; disabled when Include datasource is off)
-        gc.gridx = 1; gc.gridy = 3
+        gc.gridx = 1; gc.gridy = 4
         form.add(datasourceOptionsPanel, gc)
 
         // Dependency Injection section label
-        gc.gridx = 0; gc.gridy = 4
+        gc.gridx = 0; gc.gridy = 5
         form.add(JBLabel("Dependency Injection:"), gc)
         // Include DI checkbox
-        gc.gridx = 1; gc.gridy = 4
+        gc.gridx = 1; gc.gridy = 5
         form.add(includeDiCheckBox, gc)
         // DI options panel (always visible; disabled when include DI is off)
-        gc.gridx = 1; gc.gridy = 5
+        gc.gridx = 1; gc.gridy = 6
         form.add(diOptionsPanel, gc)
 
         // Presentation section label
-        gc.gridx = 0; gc.gridy = 6
+        gc.gridx = 0; gc.gridy = 7
         form.add(JBLabel("Presentation:"), gc)
         // Include presentation checkbox
-        gc.gridx = 1; gc.gridy = 6
+        gc.gridx = 1; gc.gridy = 7
         form.add(includePresentationCheckBox, gc)
 
         panel.add(form, BorderLayout.NORTH)
@@ -302,6 +338,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
 
     /** DI section getters */
     fun getIncludeDi(): Boolean = includeDiCheckBox.isSelected
-    fun isDiHiltSelected(): Boolean = diHiltCheckBox.isSelected
-    fun isDiKoinSelected(): Boolean = diKoinCheckBox.isSelected
+    fun isDiHiltSelected(): Boolean = diHiltRadioButton.isSelected
+    fun isDiKoinSelected(): Boolean = diKoinRadioButton.isSelected
+    fun isDiKoinAnnotationsSelected(): Boolean = koinAnnotationsCheckBox.isSelected
 }
