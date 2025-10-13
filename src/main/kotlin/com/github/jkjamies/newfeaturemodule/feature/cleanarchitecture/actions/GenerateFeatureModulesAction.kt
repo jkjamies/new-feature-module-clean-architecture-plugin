@@ -30,6 +30,12 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
         if (!dialog.showAndGet()) return
 
         val (rootName, featureName) = dialog.getValues()
+        val includePresentation = dialog.getIncludePresentation()
+        val includeDatasource = dialog.getIncludeDatasource()
+        val dsCombined = dialog.isDatasourceCombinedSelected()
+        val dsRemote = dialog.isDatasourceRemoteSelected()
+        val dsLocal = dialog.isDatasourceLocalSelected()
+        val includeDi = dialog.getIncludeDi()
         val basePath = project.basePath ?: run {
             Messages.showErrorDialog(project, "Project base path not found", "Error")
             return
@@ -37,7 +43,17 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
 
         WriteCommandAction.runWriteCommandAction(project) {
             try {
-                val resultMsg = FeatureModulesGenerator(project).generate(basePath, rootName, featureName)
+                val resultMsg = FeatureModulesGenerator(project).generate(
+                    basePath,
+                    rootName,
+                    featureName,
+                    includePresentation,
+                    includeDatasource,
+                    dsCombined,
+                    dsRemote,
+                    dsLocal,
+                    includeDi
+                )
                 Messages.showInfoMessage(project, resultMsg, "Success")
             } catch (t: Throwable) {
                 Messages.showErrorDialog(project, "Failed to generate modules: ${t.message}", "Error")

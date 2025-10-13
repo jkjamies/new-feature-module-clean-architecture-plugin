@@ -23,9 +23,25 @@ class FeatureModulesGenerator(private val project: Project) {
      * @param projectBasePath absolute path to the IDE project root as returned by [Project.basePath]
      * @param rootName folder under the project root that contains features (for example, "features")
      * @param featureName the feature folder name to create or reuse
+     * @param includePresentation whether to include "presentation" module
+     * @param includeDatasource whether to include datasource-related modules
+     * @param datasourceCombined if true, include a single "dataSource" module
+     * @param datasourceRemote if true, include a "remoteDataSource" module (ignored when combined)
+     * @param datasourceLocal if true, include a "localDataSource" module (ignored when combined)
+     * @param includeDi whether to include the "di" module
      * @return human-friendly summary of the work performed
      */
-    fun generate(projectBasePath: String, rootName: String, featureName: String): String {
+    fun generate(
+        projectBasePath: String,
+        rootName: String,
+        featureName: String,
+        includePresentation: Boolean = true,
+        includeDatasource: Boolean = false,
+        datasourceCombined: Boolean = false,
+        datasourceRemote: Boolean = false,
+        datasourceLocal: Boolean = false,
+        includeDi: Boolean = true
+    ): String {
         val lfs = LocalFileSystem.getInstance()
         val baseDir = lfs.refreshAndFindFileByPath(projectBasePath)
             // ensure VFS sees the project root
@@ -36,7 +52,19 @@ class FeatureModulesGenerator(private val project: Project) {
         // create specific feature dir if absent
         val featureVf = rootVf.findChild(featureName) ?: rootVf.createChildDirectory(this, featureName)
 
-        val modules = listOf("domain", "data", "di", "presentation")
+        val baseModules = mutableListOf("domain", "data")
+        if (includeDi) baseModules.add("di")
+        if (includePresentation) baseModules.add("presentation")
+        // Datasource modules based on flags
+        if (includeDatasource) {
+            if (datasourceCombined) {
+                baseModules.add("dataSource")
+            } else {
+                if (datasourceRemote) baseModules.add("remoteDataSource")
+                if (datasourceLocal) baseModules.add("localDataSource")
+            }
+        }
+        val modules = baseModules.toList()
         // track which modules we actually created
         val created = mutableListOf<String>()
         // collect Gradle include paths for settings.gradle
@@ -58,7 +86,7 @@ class FeatureModulesGenerator(private val project: Project) {
         }
 
         // idempotently add includes
-        settingsUpdater.updateRootSettingsIncludes(project, projectBasePath, pathsToInclude)
+        settingsUpdater.updateRootSettingsIncludes(projectBasePath, pathsToInclude)
         // ensure the IDE reflects new directories/files
         featureVf.refresh(true, true)
 

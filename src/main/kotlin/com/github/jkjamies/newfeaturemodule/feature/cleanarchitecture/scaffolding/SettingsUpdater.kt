@@ -1,6 +1,5 @@
 package com.github.jkjamies.newfeaturemodule.feature.cleanarchitecture.scaffolding
 
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 
@@ -16,7 +15,7 @@ class SettingsUpdater {
      * settings file located under [projectBasePath]. If no settings file exists, a
      * Kotlin DSL variant is created.
      */
-    fun updateRootSettingsIncludes(project: Project, projectBasePath: String, moduleGradlePaths: List<String>) {
+    fun updateRootSettingsIncludes(projectBasePath: String, moduleGradlePaths: List<String>) {
         val lfs = LocalFileSystem.getInstance()
         val projectRootVf = lfs.findFileByPath(projectBasePath)
             // must resolve root to update settings file
@@ -39,7 +38,6 @@ class SettingsUpdater {
             val includeLine = if (isKts) "include(\"$path\")" else "include '$path'"
             // idempotency: append only if missing
             if (!current.contains(includeLine)) {
-                builder.appendLine()
                 builder.appendLine(includeLine)
                 modified = true
             }

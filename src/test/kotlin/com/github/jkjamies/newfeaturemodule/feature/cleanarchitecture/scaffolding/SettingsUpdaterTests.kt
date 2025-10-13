@@ -7,10 +7,10 @@ import com.intellij.testFramework.LightPlatformTestCase
 import java.nio.file.Files
 
 /**
- * Tests that [SettingsUpdater] appends include lines only once in settings.gradle(.kts).
+ * Tests that [SettingsUpdater] appends include lines only once in settings.gradle(.kts) and settings.gradle.
  */
 class SettingsUpdaterTests : LightPlatformTestCase() {
-    fun testUpdateRootSettingsIncludesAppendsOnce() {
+    fun testUpdateRootSettingsIncludesAppendsOnceKts() {
         val tempRoot = Files.createTempDirectory("settings-updater-test").toFile()
         val vfRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempRoot)
             ?: error("root VFS not found")
@@ -26,8 +26,8 @@ class SettingsUpdaterTests : LightPlatformTestCase() {
 
         // perform updates twice to verify idempotency
         com.intellij.openapi.application.WriteAction.run<RuntimeException> {
-            updater.updateRootSettingsIncludes(project, vfRoot.path, paths)
-            updater.updateRootSettingsIncludes(project, vfRoot.path, paths)
+            updater.updateRootSettingsIncludes(vfRoot.path, paths)
+            updater.updateRootSettingsIncludes(vfRoot.path, paths)
         }
 
         val content = VfsUtil.loadText(settingsFile)
@@ -36,6 +36,32 @@ class SettingsUpdaterTests : LightPlatformTestCase() {
         // ensure exactly one include line exists
         assertEquals(1, Regex("^${Regex.escape(domainLine)}$", RegexOption.MULTILINE).findAll(content).count())
         // ensure exactly one include line exists
+        assertEquals(1, Regex("^${Regex.escape(dataLine)}$", RegexOption.MULTILINE).findAll(content).count())
+    }
+
+    fun testUpdateRootSettingsIncludesSupportsGroovy() {
+        val tempRoot = Files.createTempDirectory("settings-updater-test-groovy").toFile()
+        val vfRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempRoot)
+            ?: error("root VFS not found")
+
+        val settingsFile = com.intellij.openapi.application.WriteAction.compute<VirtualFile, RuntimeException> {
+            val f = vfRoot.createChildData(this, "settings.gradle")
+            VfsUtil.saveText(f, "rootProject.name = 'demo'\n")
+            f
+        }
+
+        val updater = SettingsUpdater()
+        val paths = listOf(":features:catalog:domain", ":features:catalog:data")
+
+        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+            updater.updateRootSettingsIncludes(vfRoot.path, paths)
+            updater.updateRootSettingsIncludes(vfRoot.path, paths)
+        }
+
+        val content = VfsUtil.loadText(settingsFile)
+        val domainLine = "include ':features:catalog:domain'"
+        val dataLine = "include ':features:catalog:data'"
+        assertEquals(1, Regex("^${Regex.escape(domainLine)}$", RegexOption.MULTILINE).findAll(content).count())
         assertEquals(1, Regex("^${Regex.escape(dataLine)}$", RegexOption.MULTILINE).findAll(content).count())
     }
 }
