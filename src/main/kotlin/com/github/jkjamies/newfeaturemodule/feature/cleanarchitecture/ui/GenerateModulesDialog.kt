@@ -2,6 +2,7 @@ package com.github.jkjamies.newfeaturemodule.feature.cleanarchitecture.ui
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextField
@@ -14,6 +15,7 @@ import java.awt.event.ItemEvent
 import javax.swing.ButtonGroup
 import javax.swing.JComponent
 import javax.swing.JPanel
+import javax.swing.event.DocumentEvent
 
 /**
  * Dialog used by the action to capture the root features folder and the feature name.
@@ -24,6 +26,10 @@ import javax.swing.JPanel
 class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     private val rootField = JBTextField()
     private val featureField = JBTextField()
+    // Organization segmented UI: left label "com.", center input, right dynamic label
+    private val orgLeftLabel = JBLabel("com.")
+    private val orgCenterField = JBTextField("jkjamies")
+    private val orgRightLabel = JBLabel("")
 
     // Platform section controls
     private val platformAndroidRadioButton = JBRadioButton("Android", true)
@@ -78,6 +84,26 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         title = "Generate Clean Architecture Modules"
         rootField.columns = 28
         featureField.columns = 28
+        orgCenterField.columns = 16
+
+        // Update the right-side package preview label when root/feature change
+        fun updateOrgPreview() {
+            val root = rootField.text.trim().ifEmpty { "root" }
+            val feature = featureField.text.trim().ifEmpty { "feature" }
+            orgRightLabel.text = ".$root.$feature.{data, di, domain, presentation, dataSource, remoteDataSource, localDataSource}"
+        }
+        // initial preview
+        updateOrgPreview()
+        rootField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) {
+                updateOrgPreview()
+            }
+        })
+        featureField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) {
+                updateOrgPreview()
+            }
+        })
 
         // Wire up datasource selection logic
         fun updateDatasourceStates() {
@@ -267,6 +293,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             insets = JBUI.insets(8, 12)
         }
 
+        // Root folder input
         gc.gridx = 0; gc.gridy = 0
         form.add(JBLabel("Root folder under project (e.g., features):"), gc)
         gc.gridx = 1
@@ -274,6 +301,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         gc.weightx = 1.0
         form.add(rootField, gc)
 
+        // Feature name input
         gc.gridx = 0; gc.gridy = 1
         gc.weightx = 0.0
         gc.fill = GridBagConstraints.NONE
@@ -283,39 +311,53 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         gc.weightx = 1.0
         form.add(featureField, gc)
 
-        // Platform section label
+        // Organization segmented input (left.center.right)
         gc.gridx = 0; gc.gridy = 2
+        form.add(JBLabel("Organization segments (left.center.right):"), gc)
+        gc.gridx = 1
+        gc.fill = GridBagConstraints.HORIZONTAL
+        gc.weightx = 1.0
+        val orgPanel = JPanel(BorderLayout()).apply {
+            border = JBUI.Borders.emptyLeft(0)
+            add(orgLeftLabel, BorderLayout.WEST)
+            add(orgCenterField, BorderLayout.CENTER)
+            add(orgRightLabel, BorderLayout.EAST)
+        }
+        form.add(orgPanel, gc)
+
+        // Platform section label
+        gc.gridx = 0; gc.gridy = 3
         form.add(JBLabel("Platform:"), gc)
         // Platform options panel (Android / KMP)
-        gc.gridx = 1; gc.gridy = 2
+        gc.gridx = 1; gc.gridy = 3
         form.add(platformOptionsPanel, gc)
 
         // Data section label
-        gc.gridx = 0; gc.gridy = 3
+        gc.gridx = 0; gc.gridy = 4
         form.add(JBLabel("Data:"), gc)
         // Include datasource checkbox
-        gc.gridx = 1; gc.gridy = 3
+        gc.gridx = 1; gc.gridy = 4
         form.add(includeDatasourceCheckBox, gc)
 
         // Datasource options panel (always visible; disabled when Include datasource is off)
-        gc.gridx = 1; gc.gridy = 4
+        gc.gridx = 1; gc.gridy = 5
         form.add(datasourceOptionsPanel, gc)
 
         // Dependency Injection section label
-        gc.gridx = 0; gc.gridy = 5
+        gc.gridx = 0; gc.gridy = 6
         form.add(JBLabel("Dependency Injection:"), gc)
         // Include DI checkbox
-        gc.gridx = 1; gc.gridy = 5
+        gc.gridx = 1; gc.gridy = 6
         form.add(includeDiCheckBox, gc)
         // DI options panel (always visible; disabled when include DI is off)
-        gc.gridx = 1; gc.gridy = 6
+        gc.gridx = 1; gc.gridy = 7
         form.add(diOptionsPanel, gc)
 
         // Presentation section label
-        gc.gridx = 0; gc.gridy = 7
+        gc.gridx = 0; gc.gridy = 8
         form.add(JBLabel("Presentation:"), gc)
         // Include presentation checkbox
-        gc.gridx = 1; gc.gridy = 7
+        gc.gridx = 1; gc.gridy = 8
         form.add(includePresentationCheckBox, gc)
 
         panel.add(form, BorderLayout.NORTH)
@@ -326,6 +368,11 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
      * Returns the trimmed root and feature values as a [Pair].
      */
     fun getValues(): Pair<String, String> = rootField.text.trim() to featureField.text.trim()
+
+    /** Returns the organization segment inserted after 'com.' in the base package. */
+    fun getOrgSegment(): String {
+        return orgCenterField.text.trim()
+    }
 
     /** Returns whether the presentation module should be included. */
     fun getIncludePresentation(): Boolean = includePresentationCheckBox.isSelected

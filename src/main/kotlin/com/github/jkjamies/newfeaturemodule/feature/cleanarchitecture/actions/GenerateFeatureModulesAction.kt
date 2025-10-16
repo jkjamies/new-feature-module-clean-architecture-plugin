@@ -30,6 +30,7 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
         if (!dialog.showAndGet()) return
 
         val (rootName, featureName) = dialog.getValues()
+        val orgSegment = dialog.getOrgSegment()
         val includePresentation = dialog.getIncludePresentation()
         val includeDatasource = dialog.getIncludeDatasource()
         val dsCombined = dialog.isDatasourceCombinedSelected()
@@ -52,7 +53,8 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
                     dsCombined,
                     dsRemote,
                     dsLocal,
-                    includeDi
+                    includeDi,
+                    orgSegment
                 )
                 Messages.showInfoMessage(project, resultMsg, "Success")
             } catch (t: Throwable) {

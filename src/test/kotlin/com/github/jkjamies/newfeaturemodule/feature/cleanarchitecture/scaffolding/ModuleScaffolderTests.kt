@@ -21,10 +21,13 @@ class ModuleScaffolderTests : LightPlatformTestCase() {
 
         val scaffolder = ModuleScaffolder()
         com.intellij.openapi.application.WriteAction.run<RuntimeException> {
-            scaffolder.scaffoldModule(moduleDir, "domain", "features", "payments")
+            scaffolder.scaffoldModule(moduleDir, "domain", "features", "payments", "jkjamies")
         }
 
-        assertNotNull(moduleDir.findChild("build.gradle.kts"))
+        val buildFile = moduleDir.findChild("build.gradle.kts") ?: error("build.gradle.kts not created")
+        val buildContent = VfsUtil.loadText(buildFile)
+        // Namespace should be replaced with the computed package for the domain module
+        assertTrue(buildContent.contains("namespace = \"com.jkjamies.features.payments.domain\""))
 
         val pkgPath = "src/main/kotlin/com/jkjamies/features/payments/domain"
         val pkgDir = VfsUtil.findRelativeFile(pkgPath, moduleDir)

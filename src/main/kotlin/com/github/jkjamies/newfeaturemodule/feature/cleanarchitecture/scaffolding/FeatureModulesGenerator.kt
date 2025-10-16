@@ -41,6 +41,30 @@ class FeatureModulesGenerator(private val project: Project) {
         datasourceRemote: Boolean = false,
         datasourceLocal: Boolean = false,
         includeDi: Boolean = true
+    ): String = generate(
+        projectBasePath,
+        rootName,
+        featureName,
+        includePresentation,
+        includeDatasource,
+        datasourceCombined,
+        datasourceRemote,
+        datasourceLocal,
+        includeDi,
+        orgSegment = "jkjamies"
+    )
+
+    fun generate(
+        projectBasePath: String,
+        rootName: String,
+        featureName: String,
+        includePresentation: Boolean = true,
+        includeDatasource: Boolean = false,
+        datasourceCombined: Boolean = false,
+        datasourceRemote: Boolean = false,
+        datasourceLocal: Boolean = false,
+        includeDi: Boolean = true,
+        orgSegment: String
     ): String {
         val lfs = LocalFileSystem.getInstance()
         val baseDir = lfs.refreshAndFindFileByPath(projectBasePath)
@@ -78,7 +102,7 @@ class FeatureModulesGenerator(private val project: Project) {
                     // defensive: VFS could return null on failure
                     ?: error("Failed to create module directory: $name")
                 // generate build file, src tree, and placeholder
-                moduleScaffolder.scaffoldModule(moduleDir, name, rootName, featureName)
+                moduleScaffolder.scaffoldModule(moduleDir, name, rootName, featureName, orgSegment)
                 created.add(name)
             }
             // compute :root:feature:module path

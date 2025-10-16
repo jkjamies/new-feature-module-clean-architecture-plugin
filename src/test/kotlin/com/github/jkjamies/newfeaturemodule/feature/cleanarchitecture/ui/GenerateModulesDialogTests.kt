@@ -15,20 +15,25 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
 
         // access private UI fields via reflection for testing
         val rootField = dialog.javaClass.getDeclaredField("rootField").apply { isAccessible = true }
-        // access private UI fields via reflection for testing
         val featureField = dialog.javaClass.getDeclaredField("featureField").apply { isAccessible = true }
+        val orgCenterField = dialog.javaClass.getDeclaredField("orgCenterField").apply { isAccessible = true }
 
         val rootTextField = rootField.get(dialog) as com.intellij.ui.components.JBTextField
         val featureTextField = featureField.get(dialog) as com.intellij.ui.components.JBTextField
+        val orgCenterTextField = orgCenterField.get(dialog) as com.intellij.ui.components.JBTextField
 
-        // leading/trailing spaces should be trimmed by getValues
+        // default org should be 'jkjamies'
+        assertEquals("jkjamies", dialog.getOrgSegment())
+
+        // leading/trailing spaces should be trimmed by getters
         rootTextField.text = "  libs  "
-        // leading/trailing spaces should be trimmed by getValues
         featureTextField.text = "  profiles  "
+        orgCenterTextField.text = "  acme  "
 
         val (root, feature) = dialog.getValues()
         assertEquals("libs", root)
         assertEquals("profiles", feature)
+        assertEquals("acme", dialog.getOrgSegment())
     }
 
     fun testDialogTitle() {
