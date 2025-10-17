@@ -1,19 +1,19 @@
 <idea-plugin>
-    <id>com.github.jkjamies.featuremoduleplugin</id>
-    <name>new-feature-module-clean-architecture</name>
+    <id>com.github.jkjamies.cammp</id>
+    <name>CAMMP</name>
     <vendor>jkjamies</vendor>
 
     <depends>com.intellij.modules.platform</depends>
 
     <actions>
-        <group id="com.github.jkjamies.newfeaturemodule.actions.CleanArchitectureGroup"
+        <group id="com.github.jkjamies.cammp.actions.CleanArchitectureGroup"
                text="Clean Architecture"
                description="Tools for Clean Architecture modules"
                popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
 
-            <action id="com.github.jkjamies.newfeaturemodule.actions.GenerateModulesAction"
-                    class="com.github.jkjamies.newfeaturemodule.feature.cleanarchitecture.actions.GenerateFeatureModulesAction"
+            <action id="com.github.jkjamies.cammp.actions.GenerateModulesAction"
+                    class="com.github.jkjamies.cammp.feature.cleanarchitecture.actions.GenerateFeatureModulesAction"
                     text="Generate Clean Architecture Modules"
                     description="Create domain, data, di, and presentation modules with Gradle setup inside a named directory"/>
         </group>
