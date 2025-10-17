@@ -71,10 +71,12 @@ class FeatureModulesGenerator(private val project: Project) {
             // ensure VFS sees the project root
             ?: error("Project root not found: $projectBasePath")
 
-        // create features root if absent
-        val rootVf = baseDir.findChild(rootName) ?: baseDir.createChildDirectory(this, rootName)
+        // create features root if absent (supports nested paths like "features/shared")
+        val rootVf = VfsUtil.createDirectoryIfMissing(baseDir, rootName)
+            ?: error("Failed to access or create root directory: $rootName")
         // create specific feature dir if absent
-        val featureVf = rootVf.findChild(featureName) ?: rootVf.createChildDirectory(this, featureName)
+        val featureVf = VfsUtil.createDirectoryIfMissing(rootVf, featureName)
+            ?: error("Failed to access or create feature directory: $featureName")
 
         val baseModules = mutableListOf("domain", "data")
         if (includeDi) baseModules.add("di")

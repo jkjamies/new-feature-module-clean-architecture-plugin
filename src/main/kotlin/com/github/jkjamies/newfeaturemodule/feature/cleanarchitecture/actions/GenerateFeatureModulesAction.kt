@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import java.nio.file.Paths
 
 /**
  * Action entry point that opens [GenerateModulesDialog] and scaffolds feature modules.
@@ -29,7 +30,7 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
         val dialog = GenerateModulesDialog(project)
         if (!dialog.showAndGet()) return
 
-        val (rootName, featureName) = dialog.getValues()
+        val (rootInput, featureName) = dialog.getValues()
         val orgSegment = dialog.getOrgSegment()
         val includePresentation = dialog.getIncludePresentation()
         val includeDatasource = dialog.getIncludeDatasource()
@@ -41,6 +42,16 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
             Messages.showErrorDialog(project, "Project base path not found", "Error")
             return
         }
+
+        // Convert absolute root input (under project base) to a project-relative path for the generator
+        val rootName = try {
+            val inPath = Paths.get(rootInput)
+            if (inPath.isAbsolute) {
+                val normBase = Paths.get(basePath).toAbsolutePath().normalize()
+                val normIn = inPath.toAbsolutePath().normalize()
+                if (normIn.startsWith(normBase)) normBase.relativize(normIn).toString() else rootInput
+            } else rootInput
+        } catch (t: Throwable) { rootInput }
 
         WriteCommandAction.runWriteCommandAction(project) {
             try {

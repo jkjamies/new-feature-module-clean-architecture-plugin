@@ -6,11 +6,33 @@ import com.intellij.testFramework.LightPlatformTestCase
  * Verifies the behavior of [GenerateModulesDialog], including default values and title.
  */
 class GenerateModulesDialogTests : LightPlatformTestCase() {
+    fun testRootFieldShowsAbsoluteProjectPathAndValidatesOutside() {
+        val dialog = GenerateModulesDialog(project)
+        val rootField = dialog.javaClass.getDeclaredField("rootField").apply { isAccessible = true }
+        val rootBrowse = rootField.get(dialog) as com.intellij.openapi.ui.TextFieldWithBrowseButton
+        val tf = rootBrowse.textField
+
+        val base = project.basePath ?: return
+        // Set to absolute path under project -> should remain absolute (no normalization)
+        tf.text = base + "/features"
+        com.intellij.testFramework.PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+        assertEquals(base + "/features", rootBrowse.text)
+
+        // Outside project absolute path should cause validation error
+        val parent = java.io.File(base).parentFile?.absolutePath ?: return
+        val outside = parent + "/outside-folder"
+        tf.text = outside
+
+        val m = dialog.javaClass.getDeclaredMethod("doValidate").apply { isAccessible = true }
+        val vi = m.invoke(dialog)
+        assertNotNull("Validation should fail for outside project path", vi)
+    }
     fun testGetValuesReturnsTrimmedFieldsAndDefaults() {
         val dialog = GenerateModulesDialog(project)
 
         val (defaultRoot, defaultFeature) = dialog.getValues()
-        assertEquals("", defaultRoot)
+        val base = project.basePath ?: return
+        assertEquals(base, defaultRoot)
         assertEquals("", defaultFeature)
 
         // access private UI fields via reflection for testing
@@ -18,12 +40,14 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
         val featureField = dialog.javaClass.getDeclaredField("featureField").apply { isAccessible = true }
         val orgCenterField = dialog.javaClass.getDeclaredField("orgCenterField").apply { isAccessible = true }
 
-        val rootTextField = rootField.get(dialog) as com.intellij.ui.components.JBTextField
+        val rootBrowse = rootField.get(dialog) as com.intellij.openapi.ui.TextFieldWithBrowseButton
+        val rootTextField = rootBrowse.textField
         val featureTextField = featureField.get(dialog) as com.intellij.ui.components.JBTextField
         val orgCenterTextField = orgCenterField.get(dialog) as com.intellij.ui.components.JBTextField
 
-        // default org should be 'jkjamies'
-        assertEquals("jkjamies", dialog.getOrgSegment())
+        // default org should be last segment of the project root
+        val expectedOrg = java.nio.file.Paths.get(base).fileName?.toString() ?: ""
+        assertEquals(expectedOrg, dialog.getOrgSegment())
 
         // leading/trailing spaces should be trimmed by getters
         rootTextField.text = "  libs  "
@@ -220,5 +244,31 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
         assertFalse(kmp.isSelected)
         assertTrue(hilt.isEnabled)
         assertTrue(koin.isEnabled)
+    }
+
+    fun testIncludePresentationDefault() {
+        val dialog = GenerateModulesDialog(project)
+        assertTrue(dialog.getIncludePresentation())
+    }
+
+    fun testOrgPreviewOmitRootWhenRootEqualsProjectBase() {
+        val dialog = GenerateModulesDialog(project)
+        val base = project.basePath ?: return
+        // Access fields
+        val rootField = dialog.javaClass.getDeclaredField("rootField").apply { isAccessible = true }
+        val featureField = dialog.javaClass.getDeclaredField("featureField").apply { isAccessible = true }
+        val orgRightLabelField = dialog.javaClass.getDeclaredField("orgRightLabel").apply { isAccessible = true }
+
+        val rootBrowse = rootField.get(dialog) as com.intellij.openapi.ui.TextFieldWithBrowseButton
+        val featureTf = featureField.get(dialog) as com.intellij.ui.components.JBTextField
+        val rightLabel = orgRightLabelField.get(dialog) as com.intellij.ui.components.JBLabel
+
+        // Set root to project base and feature to 'foo' and ensure preview omits root
+        rootBrowse.text = base
+        featureTf.text = "foo"
+        com.intellij.testFramework.PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+
+        val text = rightLabel.text
+        assertTrue("Preview should omit root when equals project base", text.startsWith(".foo.{"))
     }
 }

@@ -16,6 +16,8 @@ import javax.swing.ButtonGroup
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.event.DocumentEvent
+import com.intellij.openapi.ui.ValidationInfo
+import java.nio.file.Paths
 
 /**
  * Dialog used by the action to capture the root features folder and the feature name.
@@ -24,7 +26,8 @@ import javax.swing.event.DocumentEvent
  * The text fields are simple [JBTextField] components sized for typical names.
  */
 class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
-    private val rootField = JBTextField()
+    private val projectBasePath: String? = project.basePath
+    private val rootField = com.intellij.openapi.ui.TextFieldWithBrowseButton(JBTextField())
     private val featureField = JBTextField()
     // Organization segmented UI: left label "com.", center input, right dynamic label
     private val orgLeftLabel = JBLabel("com.")
@@ -82,20 +85,51 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
 
     init {
         title = "Generate Clean Architecture Modules"
-        rootField.columns = 28
+        rootField.textField.columns = 28
         featureField.columns = 28
         orgCenterField.columns = 16
 
-        // Update the right-side package preview label when root/feature change
-        fun updateOrgPreview() {
-            val root = rootField.text.trim().ifEmpty { "root" }
-            val feature = featureField.text.trim().ifEmpty { "feature" }
-            orgRightLabel.text = ".$root.$feature.{data, di, domain, presentation, dataSource, remoteDataSource, localDataSource}"
+        // Prepopulate org segment with the last path segment of the project root
+        projectBasePath?.let { base ->
+            val seg = try { Paths.get(base).fileName?.toString() ?: "" } catch (t: Throwable) { "" }
+            if (seg.isNotBlank()) orgCenterField.text = seg
         }
-        // initial preview
+
+        // Update the right-side package preview label when root/feature change
+        // Moved to private method for readability
+        // Configure directory chooser scoped to project base
+        run {
+            val descriptor = com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFolderDescriptor()
+            val basePath = projectBasePath
+            if (basePath != null) {
+                val baseVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
+                if (baseVf != null) descriptor.withRoots(baseVf)
+            }
+            rootField.addBrowseFolderListener(
+                "Select root folder under project",
+                null,
+                project,
+                descriptor,
+                object : com.intellij.openapi.ui.TextComponentAccessor<javax.swing.JTextField> {
+                    override fun getText(component: javax.swing.JTextField): String {
+                        val t = component.text
+                        val base = projectBasePath
+                        return if (t.isNullOrBlank() && base != null) base else t
+                    }
+                    override fun setText(component: javax.swing.JTextField, text: String) {
+                        component.text = text
+                    }
+                }
+            )
+        }
+
+        // Prepopulate root field with project base path so the user sees the full absolute path
+        projectBasePath?.let { base -> rootField.text = base }
+
         updateOrgPreview()
-        rootField.document.addDocumentListener(object : DocumentAdapter() {
+        rootField.textField.document.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
+                // Keep user input as-is (absolute or relative). Only update the preview label.
                 updateOrgPreview()
             }
         })
@@ -106,63 +140,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         })
 
         // Wire up datasource selection logic
-        fun updateDatasourceStates() {
-            if (!includeDatasourceCheckBox.isSelected) {
-                // When section is disabled, clear all selections and disable all options
-                adjustingDatasourceSelections = true
-                try {
-                    combinedDatasourceCheckBox.isSelected = false
-                    remoteDatasourceCheckBox.isSelected = false
-                    localDatasourceCheckBox.isSelected = false
-                } finally {
-                    adjustingDatasourceSelections = false
-                }
-                combinedDatasourceCheckBox.isEnabled = false
-                remoteDatasourceCheckBox.isEnabled = false
-                localDatasourceCheckBox.isEnabled = false
-                return
-            }
-            // Include datasource is enabled: compute enablement/selection per rules
-            if (combinedDatasourceCheckBox.isSelected) {
-                // combined selected disables and clears remote/local
-                adjustingDatasourceSelections = true
-                try {
-                    remoteDatasourceCheckBox.isSelected = false
-                    localDatasourceCheckBox.isSelected = false
-                } finally {
-                    adjustingDatasourceSelections = false
-                }
-                remoteDatasourceCheckBox.isEnabled = false
-                localDatasourceCheckBox.isEnabled = false
-                combinedDatasourceCheckBox.isEnabled = true
-            } else {
-                // when enabling includeDatasource, default remote+local = true, combined = false
-                if (includeDatasourceCheckBox.isSelected) {
-                    adjustingDatasourceSelections = true
-                    try {
-                        if (!remoteDatasourceCheckBox.isSelected && !localDatasourceCheckBox.isSelected && !combinedDatasourceCheckBox.isSelected) {
-                            remoteDatasourceCheckBox.isSelected = true
-                            localDatasourceCheckBox.isSelected = true
-                        }
-                        combinedDatasourceCheckBox.isSelected = false
-                    } finally {
-                        adjustingDatasourceSelections = false
-                    }
-                }
-                // By default (no combined), allow interaction
-                combinedDatasourceCheckBox.isEnabled = true
-                remoteDatasourceCheckBox.isEnabled = true
-                localDatasourceCheckBox.isEnabled = true
-
-                // If exactly one of remote/local is selected, disable the selected one to avoid ending up with none selected
-                val remoteSelected = remoteDatasourceCheckBox.isSelected
-                val localSelected = localDatasourceCheckBox.isSelected
-                val exactlyOne = remoteSelected.xor(localSelected)
-
-                remoteDatasourceCheckBox.isEnabled = !exactlyOne || !remoteSelected
-                localDatasourceCheckBox.isEnabled = !exactlyOne || !localSelected
-            }
-        }
+        // Moved state update function to a private method for readability
 
         includeDatasourceCheckBox.addItemListener { updateDatasourceStates() }
         combinedDatasourceCheckBox.addItemListener { e ->
@@ -197,67 +175,6 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         remoteDatasourceCheckBox.addItemListener(remoteLocalListener)
         localDatasourceCheckBox.addItemListener(remoteLocalListener)
 
-        // Wire up DI selection logic
-        fun updateDiStates() {
-            if (!includeDiCheckBox.isSelected) {
-                // Clear selections and disable both when DI not included
-                adjustingDiSelections = true
-                try {
-                    // Explicitly clear both before clearing the group to avoid any retained selection state
-                    diHiltRadioButton.isSelected = false
-                    diKoinRadioButton.isSelected = false
-                    diButtonGroup.clearSelection()
-                } finally {
-                    adjustingDiSelections = false
-                }
-                diHiltRadioButton.isEnabled = false
-                diKoinRadioButton.isEnabled = false
-                // Hide and clear Koin annotations when DI is disabled
-                koinAnnotationsCheckBox.isSelected = false
-                koinAnnotationsCheckBox.isEnabled = false
-                koinAnnotationsCheckBox.isVisible = false
-                return
-            }
-
-            val isKmp = platformKmpRadioButton.isSelected
-
-            if (isKmp) {
-                // On KMP platform, only Koin is allowed
-                adjustingDiSelections = true
-                try {
-                    diButtonGroup.clearSelection()
-                    diKoinRadioButton.isSelected = true
-                    diHiltRadioButton.isSelected = false
-                } finally {
-                    adjustingDiSelections = false
-                }
-                diHiltRadioButton.isEnabled = false
-                diKoinRadioButton.isEnabled = true
-            } else {
-                // Android platform: if neither selected, default to Hilt selection explicitly
-                if (!diHiltRadioButton.isSelected && !diKoinRadioButton.isSelected) {
-                    adjustingDiSelections = true
-                    try {
-                        diButtonGroup.clearSelection()
-                        diHiltRadioButton.isSelected = true
-                        diKoinRadioButton.isSelected = false
-                    } finally {
-                        adjustingDiSelections = false
-                    }
-                }
-                // With radio buttons, mutual exclusivity is handled by ButtonGroup; both remain enabled
-                diHiltRadioButton.isEnabled = true
-                diKoinRadioButton.isEnabled = true
-            }
-
-            // Koin Annotations checkbox is only relevant when Koin is selected
-            val koinSelected = diKoinRadioButton.isSelected
-            koinAnnotationsCheckBox.isVisible = koinSelected
-            koinAnnotationsCheckBox.isEnabled = koinSelected
-            if (!koinSelected) {
-                koinAnnotationsCheckBox.isSelected = false
-            }
-        }
 
         includeDiCheckBox.addItemListener { updateDiStates() }
         diHiltRadioButton.addItemListener { e ->
@@ -276,6 +193,26 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         updateDiStates()
 
         init()
+        initValidation()
+    }
+
+    override fun doValidate(): ValidationInfo? {
+        val base = projectBasePath ?: return null
+        val input = rootField.text.trim()
+        if (input.isBlank()) return null
+        // If input is absolute and not under base, return error
+        val normBase = Paths.get(base).normalize().toAbsolutePath()
+        return try {
+            val inPath = Paths.get(input).normalize().toAbsolutePath()
+            val isAbsolute = inPath.isAbsolute
+            val underBase = inPath.startsWith(normBase)
+            if (isAbsolute && !underBase) {
+                ValidationInfo("Path must be under the project root: ${normBase}", rootField)
+            } else null
+        } catch (t: Throwable) {
+            // If it's not a valid path string, let it pass as plain relative text
+            null
+        }
     }
 
     /**
@@ -321,7 +258,18 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             border = JBUI.Borders.emptyLeft(0)
             add(orgLeftLabel, BorderLayout.WEST)
             add(orgCenterField, BorderLayout.CENTER)
-            add(orgRightLabel, BorderLayout.EAST)
+            // Wrap right preview label into a fixed-width, left-aligned container to avoid layout jitter while typing
+            val maxSample = ".this_is_a_sample_root_name.this_is_a_sample_feature_name.{data, di, domain, presentation, dataSource, remoteDataSource, localDataSource}"
+            val fm = orgRightLabel.getFontMetrics(orgRightLabel.font)
+            val w = fm.stringWidth(maxSample) + JBUI.scale(8)
+            val h = orgRightLabel.preferredSize.height
+            orgRightLabel.horizontalAlignment = javax.swing.SwingConstants.LEFT
+            val rightPreviewContainer = JPanel(BorderLayout()).apply {
+                preferredSize = java.awt.Dimension(w, h)
+                minimumSize = java.awt.Dimension(w, h)
+                add(orgRightLabel, BorderLayout.CENTER)
+            }
+            add(rightPreviewContainer, BorderLayout.EAST)
         }
         form.add(orgPanel, gc)
 
@@ -388,4 +336,136 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     fun isDiHiltSelected(): Boolean = diHiltRadioButton.isSelected
     fun isDiKoinSelected(): Boolean = diKoinRadioButton.isSelected
     fun isDiKoinAnnotationsSelected(): Boolean = koinAnnotationsCheckBox.isSelected
+
+    // ---- Extracted helpers for readability ----
+    private fun updateOrgPreview() {
+        val rawRoot = rootField.text.trim()
+        val displayRoot = try {
+            if (rawRoot.isBlank()) "root" else Paths.get(rawRoot).fileName?.toString() ?: rawRoot
+        } catch (t: Throwable) {
+            if (rawRoot.isBlank()) "root" else rawRoot
+        }
+        val feature = featureField.text.trim().ifEmpty { "feature" }
+        val base = projectBasePath
+        val omitRoot = try {
+            if (base.isNullOrBlank()) false else {
+                val normIn = Paths.get(rawRoot).toAbsolutePath().normalize()
+                val normBase = Paths.get(base).toAbsolutePath().normalize()
+                normIn == normBase
+            }
+        } catch (t: Throwable) { false }
+        val suffix = if (omitRoot) {
+            ".${feature}.{data, di, domain, presentation, dataSource, remoteDataSource, localDataSource}"
+        } else {
+            ".${displayRoot}.${feature}.{data, di, domain, presentation, dataSource, remoteDataSource, localDataSource}"
+        }
+        orgRightLabel.text = suffix
+    }
+
+    private fun updateDatasourceStates() {
+        if (!includeDatasourceCheckBox.isSelected) {
+            adjustingDatasourceSelections = true
+            try {
+                combinedDatasourceCheckBox.isSelected = false
+                remoteDatasourceCheckBox.isSelected = false
+                localDatasourceCheckBox.isSelected = false
+            } finally {
+                adjustingDatasourceSelections = false
+            }
+            combinedDatasourceCheckBox.isEnabled = false
+            remoteDatasourceCheckBox.isEnabled = false
+            localDatasourceCheckBox.isEnabled = false
+            return
+        }
+        if (combinedDatasourceCheckBox.isSelected) {
+            adjustingDatasourceSelections = true
+            try {
+                remoteDatasourceCheckBox.isSelected = false
+                localDatasourceCheckBox.isSelected = false
+            } finally {
+                adjustingDatasourceSelections = false
+            }
+            remoteDatasourceCheckBox.isEnabled = false
+            localDatasourceCheckBox.isEnabled = false
+            combinedDatasourceCheckBox.isEnabled = true
+        } else {
+            if (includeDatasourceCheckBox.isSelected) {
+                adjustingDatasourceSelections = true
+                try {
+                    if (!remoteDatasourceCheckBox.isSelected && !localDatasourceCheckBox.isSelected && !combinedDatasourceCheckBox.isSelected) {
+                        remoteDatasourceCheckBox.isSelected = true
+                        localDatasourceCheckBox.isSelected = true
+                    }
+                    combinedDatasourceCheckBox.isSelected = false
+                } finally {
+                    adjustingDatasourceSelections = false
+                }
+            }
+            combinedDatasourceCheckBox.isEnabled = true
+            remoteDatasourceCheckBox.isEnabled = true
+            localDatasourceCheckBox.isEnabled = true
+
+            val remoteSelected = remoteDatasourceCheckBox.isSelected
+            val localSelected = localDatasourceCheckBox.isSelected
+            val exactlyOne = remoteSelected.xor(localSelected)
+
+            remoteDatasourceCheckBox.isEnabled = !exactlyOne || !remoteSelected
+            localDatasourceCheckBox.isEnabled = !exactlyOne || !localSelected
+        }
+    }
+
+    private fun updateDiStates() {
+        if (!includeDiCheckBox.isSelected) {
+            adjustingDiSelections = true
+            try {
+                diHiltRadioButton.isSelected = false
+                diKoinRadioButton.isSelected = false
+                diButtonGroup.clearSelection()
+            } finally {
+                adjustingDiSelections = false
+            }
+            diHiltRadioButton.isEnabled = false
+            diKoinRadioButton.isEnabled = false
+            koinAnnotationsCheckBox.isSelected = false
+            koinAnnotationsCheckBox.isEnabled = false
+            koinAnnotationsCheckBox.isVisible = false
+            return
+        }
+
+        val isKmp = platformKmpRadioButton.isSelected
+
+        if (isKmp) {
+            adjustingDiSelections = true
+            try {
+                diButtonGroup.clearSelection()
+                diKoinRadioButton.isSelected = true
+                diHiltRadioButton.isSelected = false
+            } finally {
+                adjustingDiSelections = false
+            }
+            diHiltRadioButton.isEnabled = false
+            diKoinRadioButton.isEnabled = true
+        } else {
+            if (!diHiltRadioButton.isSelected && !diKoinRadioButton.isSelected) {
+                adjustingDiSelections = true
+                try {
+                    diButtonGroup.clearSelection()
+                    diHiltRadioButton.isSelected = true
+                    diKoinRadioButton.isSelected = false
+                } finally {
+                    adjustingDiSelections = false
+                }
+            }
+            diHiltRadioButton.isEnabled = true
+            diKoinRadioButton.isEnabled = true
+        }
+
+        val koinSelected = diKoinRadioButton.isSelected
+        koinAnnotationsCheckBox.isVisible = koinSelected
+        koinAnnotationsCheckBox.isEnabled = koinSelected
+        if (!koinSelected) {
+            koinAnnotationsCheckBox.isSelected = false
+        }
+    }
 }
+
