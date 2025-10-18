@@ -16,6 +16,11 @@
                     class="com.github.jkjamies.cammp.feature.cleanarchitecture.actions.GenerateFeatureModulesAction"
                     text="Generate Clean Architecture Modules"
                     description="Create domain, data, di, and presentation modules with Gradle setup inside a named directory"/>
+
+            <action id="com.github.jkjamies.cammp.actions.GeneratePresentationScreenAction"
+                    class="com.github.jkjamies.cammp.feature.presentationgenerator.actions.GeneratePresentationScreenAction"
+                    text="Generate Presentation Screen"
+                    description="Create a presentation screen with optional navigation and state holders"/>
         </group>
     </actions>
 </idea-plugin>
