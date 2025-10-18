@@ -104,7 +104,17 @@ class FeatureModulesGenerator(private val project: Project) {
                     // defensive: VFS could return null on failure
                     ?: error("Failed to create module directory: $name")
                 // generate build file, src tree, and placeholder
-                moduleScaffolder.scaffoldModule(moduleDir, name, rootName, featureName, orgSegment)
+                moduleScaffolder.scaffoldModule(
+                    moduleDir,
+                    name,
+                    rootName,
+                    featureName,
+                    orgSegment,
+                    includeDatasource = includeDatasource,
+                    datasourceCombined = datasourceCombined,
+                    datasourceRemote = datasourceRemote,
+                    datasourceLocal = datasourceLocal
+                )
                 created.add(name)
             }
             // compute :root:feature:module path
@@ -113,6 +123,7 @@ class FeatureModulesGenerator(private val project: Project) {
 
         // idempotently add includes
         settingsUpdater.updateRootSettingsIncludes(projectBasePath, pathsToInclude)
+
         // ensure the IDE reflects new directories/files
         featureVf.refresh(true, true)
 

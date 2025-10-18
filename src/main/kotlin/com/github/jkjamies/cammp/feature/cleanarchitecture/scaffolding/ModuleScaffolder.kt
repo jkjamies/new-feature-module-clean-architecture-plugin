@@ -12,7 +12,35 @@ class ModuleScaffolder {
      * Ensures Gradle build file and source directories exist under [moduleDir] and writes
      * a simple placeholder Kotlin file in package `com.<orgSegment>.[rootName].[featureName].[moduleName]`.
      */
-    fun scaffoldModule(moduleDir: VirtualFile, moduleName: String, rootName: String, featureName: String, orgSegment: String) {
+    fun scaffoldModule(
+        moduleDir: VirtualFile,
+        moduleName: String,
+        rootName: String,
+        featureName: String,
+        orgSegment: String
+    ) = scaffoldModule(
+        moduleDir,
+        moduleName,
+        rootName,
+        featureName,
+        orgSegment,
+        includeDatasource = false,
+        datasourceCombined = false,
+        datasourceRemote = false,
+        datasourceLocal = false
+    )
+
+    fun scaffoldModule(
+        moduleDir: VirtualFile,
+        moduleName: String,
+        rootName: String,
+        featureName: String,
+        orgSegment: String,
+        includeDatasource: Boolean = false,
+        datasourceCombined: Boolean = false,
+        datasourceRemote: Boolean = false,
+        datasourceLocal: Boolean = false
+    ) {
         val templateName = when (moduleName) {
             "domain" -> "domain"
             "data" -> "data"
@@ -26,6 +54,7 @@ class ModuleScaffolder {
         // Prefer new organized location under template/cleanArchitecture, with fallbacks for compatibility
         val candidatePaths = listOf(
             "template/cleanArchitecture/${templateName}.gradle.kts",
+            "templates/cleanArchitecture/${templateName}.gradle.kts",
             "templates/gradle/${templateName}.gradle.kts",
             "templates/${templateName}.gradle.kts"
         )
@@ -67,6 +96,27 @@ class ModuleScaffolder {
         val pkgDir = VfsUtil.createDirectories(pkgDirPath)
         // create only if missing
         FileUtilExt.writeFileIfAbsent(pkgDir, "Placeholder.kt", placeholder)
+
+        // Additional clean architecture subdirectories
+        when (moduleName) {
+            "domain" -> {
+                VfsUtil.createDirectories(pkgDir.path + "/repository").refresh(false, true)
+                VfsUtil.createDirectories(pkgDir.path + "/model").refresh(false, true)
+                VfsUtil.createDirectories(pkgDir.path + "/usecase").refresh(false, true)
+            }
+            "data" -> {
+                VfsUtil.createDirectories(pkgDir.path + "/repository").refresh(false, true)
+                // Datasource subdirectories inside data module package when requested via flags
+                if (includeDatasource) {
+                    if (datasourceCombined) {
+                        VfsUtil.createDirectories(pkgDir.path + "/dataSource").refresh(false, true)
+                    } else {
+                        if (datasourceRemote) VfsUtil.createDirectories(pkgDir.path + "/remoteDataSource").refresh(false, true)
+                        if (datasourceLocal) VfsUtil.createDirectories(pkgDir.path + "/localDataSource").refresh(false, true)
+                    }
+                }
+            }
+        }
     }
 
     companion object {

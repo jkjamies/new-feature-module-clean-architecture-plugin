@@ -99,6 +99,14 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNull("remoteDataSource should not exist", featureDir.findChild("remoteDataSource"))
         assertNull("localDataSource should not exist", featureDir.findChild("localDataSource"))
 
+        // verify data module contains dataSource subdirectory when combined selected
+        val dataModule = featureDir.findChild("data") ?: error("data module not found")
+        val dataPkgPath = "src/main/kotlin/com/jkjamies/features/catalog/data"
+        val dataPkgDir = VfsUtil.findRelativeFile(dataPkgPath, dataModule) ?: error("data package dir not created")
+        assertNotNull("dataSource subdir in data module missing", dataPkgDir.findChild("dataSource"))
+        assertNull(dataPkgDir.findChild("remoteDataSource"))
+        assertNull(dataPkgDir.findChild("localDataSource"))
+
         val settingsFile = projectRootVf.findChild("settings.gradle.kts") ?: error("settings file not created")
         val content = com.intellij.openapi.vfs.VfsUtil.loadText(settingsFile)
         val expectedIncludes = listOf("domain", "data", "di", "presentation", "dataSource")
@@ -139,6 +147,14 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNotNull("localDataSource module missing", featureDir.findChild("localDataSource"))
         assertNull("dataSource (combined) should not exist", featureDir.findChild("dataSource"))
 
+        // verify data module contains remoteDataSource and localDataSource subdirectories when both selected
+        val dataModule = featureDir.findChild("data") ?: error("data module not found")
+        val dataPkgPath = "src/main/kotlin/com/jkjamies/features/account/data"
+        val dataPkgDir = VfsUtil.findRelativeFile(dataPkgPath, dataModule) ?: error("data package dir not created")
+        assertNotNull("remoteDataSource subdir in data module missing", dataPkgDir.findChild("remoteDataSource"))
+        assertNotNull("localDataSource subdir in data module missing", dataPkgDir.findChild("localDataSource"))
+        assertNull(dataPkgDir.findChild("dataSource"))
+
         val settingsFile = projectRootVf.findChild("settings.gradle.kts") ?: error("settings file not created")
         val content = com.intellij.openapi.vfs.VfsUtil.loadText(settingsFile)
         listOf("domain", "data", "di", "remoteDataSource", "localDataSource").forEach { m ->
@@ -174,6 +190,14 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNull(featureDir.findChild("localDataSource"))
         assertNull(featureDir.findChild("dataSource"))
 
+        // verify data module contains remoteDataSource subdirectory when only remote selected
+        val dataModuleRemote = featureDir.findChild("data") ?: error("data module not found")
+        val dataPkgPathRemote = "src/main/kotlin/com/jkjamies/features/search/data"
+        val dataPkgDirRemote = VfsUtil.findRelativeFile(dataPkgPathRemote, dataModuleRemote) ?: error("data package dir not created")
+        assertNotNull("remoteDataSource subdir in data module missing", dataPkgDirRemote.findChild("remoteDataSource"))
+        assertNull(dataPkgDirRemote.findChild("localDataSource"))
+        assertNull(dataPkgDirRemote.findChild("dataSource"))
+
         val content = com.intellij.openapi.vfs.VfsUtil.loadText(projectRootVf.findChild("settings.gradle.kts")!!)
         assertTrue(content.contains("include(\":features:search:remoteDataSource\")"))
         assertFalse(content.contains("include(\":features:search:localDataSource\")"))
@@ -205,6 +229,14 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNotNull(featureDir.findChild("localDataSource"))
         assertNull(featureDir.findChild("remoteDataSource"))
         assertNull(featureDir.findChild("dataSource"))
+
+        // verify data module contains localDataSource subdirectory when only local selected
+        val dataModuleLocal = featureDir.findChild("data") ?: error("data module not found")
+        val dataPkgPathLocal = "src/main/kotlin/com/jkjamies/features/prefs/data"
+        val dataPkgDirLocal = VfsUtil.findRelativeFile(dataPkgPathLocal, dataModuleLocal) ?: error("data package dir not created")
+        assertNotNull("localDataSource subdir in data module missing", dataPkgDirLocal.findChild("localDataSource"))
+        assertNull(dataPkgDirLocal.findChild("remoteDataSource"))
+        assertNull(dataPkgDirLocal.findChild("dataSource"))
 
         val content = com.intellij.openapi.vfs.VfsUtil.loadText(projectRootVf.findChild("settings.gradle.kts")!!)
         assertTrue(content.contains("include(\":features:prefs:localDataSource\")"))
