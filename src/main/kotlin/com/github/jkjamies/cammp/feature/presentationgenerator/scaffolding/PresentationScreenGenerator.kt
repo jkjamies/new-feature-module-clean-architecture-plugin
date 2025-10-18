@@ -17,6 +17,33 @@ import java.util.Locale
  */
 class PresentationScreenGenerator(private val project: Project) {
 
+    private fun loadTemplate(name: String): String {
+        // Try Kotlin template first, then legacy .tpl fallback
+        fun tryLoad(n: String): String? {
+            val resourcePath = "/templates/presentationScreen/$n"
+            return this::class.java.getResource(resourcePath)?.readText()
+                ?: this::class.java.classLoader.getResource("templates/presentationScreen/$n")?.readText()
+        }
+        // Attempt exact name
+        val exact = tryLoad(name)
+        if (exact != null) return exact
+        // Attempt counterpart extension (.kt <-> .tpl)
+        val alt = when {
+            name.endsWith(".kt") -> tryLoad(name.removeSuffix(".kt") + ".tpl")
+            name.endsWith(".tpl") -> tryLoad(name.removeSuffix(".tpl") + ".kt")
+            else -> null
+        }
+        return alt ?: error("Template not found: $name")
+    }
+
+    private fun renderTemplate(name: String, vars: Map<String, String>): String {
+        var text = loadTemplate(name)
+        for ((k, v) in vars) {
+            text = text.replace("\${'$'}{$k}", v)
+        }
+        return text
+    }
+
     private fun detectOrgSegment(presentationModuleDir: VirtualFile): String? {
         // 1) Check within this module: src/main/kotlin/com/<org>
         val inModule = VfsUtil.findRelativeFile("src/main/kotlin/com", presentationModuleDir)
@@ -92,7 +119,12 @@ class PresentationScreenGenerator(private val project: Project) {
             val fileName = "${baseName}Screen.kt"
             val screenKt = screenDir!!.findChild(fileName) ?: screenDir.createChildData(this, fileName)
             if (screenKt.length == 0L) {
-                VfsUtil.saveText(screenKt, defaultScreenContent(baseName, basePkg, folderName))
+                val content = renderTemplate("Screen.kt", mapOf(
+                    "PACKAGE" to basePkg,
+                    "FOLDER" to folderName,
+                    "BASE_NAME" to baseName
+                ))
+                VfsUtil.saveText(screenKt, content)
             }
 
             // Determine base name without trailing "Screen" for ancillary files
@@ -101,16 +133,28 @@ class PresentationScreenGenerator(private val project: Project) {
             if (patternChoice == PatternChoice.MVI) {
                 val intentName = "${baseName}Intent.kt"
                 val intentFile = screenDir.findChild(intentName) ?: screenDir.createChildData(this, intentName)
-                if (intentFile.length == 0L) VfsUtil.saveText(intentFile, defaultIntentContent(baseName, basePkg, folderName))
+                if (intentFile.length == 0L) VfsUtil.saveText(intentFile, renderTemplate("Intent.kt", mapOf(
+                    "PACKAGE" to basePkg,
+                    "FOLDER" to folderName,
+                    "BASE_NAME" to baseName
+                )))
             }
 
             val viewModelName = "${baseName}ViewModel.kt"
             val viewModelFile = screenDir.findChild(viewModelName) ?: screenDir.createChildData(this, viewModelName)
-            if (viewModelFile.length == 0L) VfsUtil.saveText(viewModelFile, defaultViewModelContent(baseName, basePkg, folderName))
+            if (viewModelFile.length == 0L) VfsUtil.saveText(viewModelFile, renderTemplate("ViewModel.kt", mapOf(
+                "PACKAGE" to basePkg,
+                "FOLDER" to folderName,
+                "BASE_NAME" to baseName
+            )))
 
             val uiStateName = "${baseName}UiState.kt"
             val uiStateFile = screenDir.findChild(uiStateName) ?: screenDir.createChildData(this, uiStateName)
-            if (uiStateFile.length == 0L) VfsUtil.saveText(uiStateFile, defaultUiStateContent(baseName, basePkg, folderName))
+            if (uiStateFile.length == 0L) VfsUtil.saveText(uiStateFile, renderTemplate("UiState.kt", mapOf(
+                "PACKAGE" to basePkg,
+                "FOLDER" to folderName,
+                "BASE_NAME" to baseName
+            )))
         }
 
         if (addNavigation) {
@@ -120,12 +164,19 @@ class PresentationScreenGenerator(private val project: Project) {
             val capPrefix = rawPrefix.replaceFirstChar { it.titlecase(Locale.getDefault()) }
             val navHostName = "${capPrefix}NavHost.kt"
             val navHost = navDir.findChild(navHostName) ?: navDir.createChildData(this, navHostName)
-            if (navHost.length == 0L) VfsUtil.saveText(navHost, defaultNavHostContent(navHostName.removeSuffix(".kt"), basePkg))
+            if (navHost.length == 0L) VfsUtil.saveText(navHost, renderTemplate("NavHost.kt", mapOf(
+                "PACKAGE" to basePkg,
+                "NAV_HOST_NAME" to navHostName.removeSuffix(".kt")
+            )))
 
             val destinationsDir = VfsUtil.createDirectoryIfMissing(navDir, "destinations")
             val destName = "${screenName}Destination.kt"
             val destFile = destinationsDir.findChild(destName) ?: destinationsDir.createChildData(this, destName)
-            if (destFile.length == 0L) VfsUtil.saveText(destFile, defaultDestinationContent(screenName, basePkg))
+            if (destFile.length == 0L) VfsUtil.saveText(destFile, renderTemplate("Destination.kt", mapOf(
+                "PACKAGE" to basePkg,
+                "SCREEN_NAME" to screenName,
+                "ROUTE" to screenName.lowercase()
+            )))
         }
 
         if (useFlowStateHolder) {
@@ -134,13 +185,20 @@ class PresentationScreenGenerator(private val project: Project) {
             val fshName = "${capPrefix}FlowStateHolder.kt"
             val hostDir = basePkgDir // place inside the base package directory
             val fshFile = hostDir.findChild(fshName) ?: hostDir.createChildData(this, fshName)
-            if (fshFile.length == 0L) VfsUtil.saveText(fshFile, defaultFlowStateHolderContent(fshName.removeSuffix(".kt"), basePkg))
+            if (fshFile.length == 0L) VfsUtil.saveText(fshFile, renderTemplate("FlowStateHolder.kt", mapOf(
+                "PACKAGE" to basePkg,
+                "FLOW_NAME" to fshName.removeSuffix(".kt")
+            )))
         }
 
         if (useScreenStateHolder && isPresentation) {
             val sshName = "${screenName}StateHolder.kt"
             val sshFile = screenDir!!.findChild(sshName) ?: screenDir.createChildData(this, sshName)
-            if (sshFile.length == 0L) VfsUtil.saveText(sshFile, defaultScreenStateHolderContent(screenName, basePkg, folderName))
+            if (sshFile.length == 0L) VfsUtil.saveText(sshFile, renderTemplate("ScreenStateHolder.kt", mapOf(
+                "PACKAGE" to basePkg,
+                "FOLDER" to folderName,
+                "SCREEN_NAME" to screenName
+            )))
         }
 
         // DI options are currently UI-only; keep feature separate from clean architecture generator

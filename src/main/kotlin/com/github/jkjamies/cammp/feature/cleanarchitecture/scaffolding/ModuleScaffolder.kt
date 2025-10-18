@@ -23,10 +23,21 @@ class ModuleScaffolder {
             "localDataSource" -> "localDataSource"
             else -> "domain"
         }
-        val resourcePath = "templates/${templateName}.gradle.kts"
-        val originalTemplate = this::class.java.getResource("/$resourcePath")?.readText()
-            ?: this::class.java.classLoader.getResource(resourcePath)?.readText()
-            ?: DEFAULT_BUILD_GRADLE
+        // Prefer new organized location under template/cleanArchitecture, with fallbacks for compatibility
+        val candidatePaths = listOf(
+            "template/cleanArchitecture/${templateName}.gradle.kts",
+            "templates/gradle/${templateName}.gradle.kts",
+            "templates/${templateName}.gradle.kts"
+        )
+        val originalTemplate = run {
+            var text: String? = null
+            for (p in candidatePaths) {
+                text = this::class.java.getResource("/$p")?.readText()
+                    ?: this::class.java.classLoader.getResource(p)?.readText()
+                if (text != null) break
+            }
+            text ?: DEFAULT_BUILD_GRADLE
+        }
 
         val safeOrg = orgSegment.trim().ifEmpty { "jkjamies" }
         val packageName = "com.$safeOrg.$rootName.$featureName.$moduleName"
