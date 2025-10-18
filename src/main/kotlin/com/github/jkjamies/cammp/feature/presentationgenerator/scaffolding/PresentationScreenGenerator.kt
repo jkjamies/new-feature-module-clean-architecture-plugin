@@ -1,6 +1,7 @@
 package com.github.jkjamies.cammp.feature.presentationgenerator.scaffolding
 
 import com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog.DiChoice
+import com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog.PatternChoice
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
@@ -43,7 +44,8 @@ class PresentationScreenGenerator(private val project: Project) {
         useFlowStateHolder: Boolean,
         useScreenStateHolder: Boolean,
         diChoice: DiChoice,
-        koinAnnotations: Boolean
+        koinAnnotations: Boolean,
+        patternChoice: PatternChoice
     ): String {
         val lfs = LocalFileSystem.getInstance()
         val baseDir = lfs.refreshAndFindFileByPath(projectBasePath)
@@ -95,10 +97,12 @@ class PresentationScreenGenerator(private val project: Project) {
 
             // Determine base name without trailing "Screen" for ancillary files
 
-            // Additional screen-layer files: Intent, ViewModel, UiState (omit trailing "Screen" in names)
-            val intentName = "${baseName}Intent.kt"
-            val intentFile = screenDir.findChild(intentName) ?: screenDir.createChildData(this, intentName)
-            if (intentFile.length == 0L) VfsUtil.saveText(intentFile, defaultIntentContent(baseName, basePkg, folderName))
+            // Additional screen-layer files: Intent (MVI only), ViewModel, UiState (omit trailing "Screen" in names)
+            if (patternChoice == PatternChoice.MVI) {
+                val intentName = "${baseName}Intent.kt"
+                val intentFile = screenDir.findChild(intentName) ?: screenDir.createChildData(this, intentName)
+                if (intentFile.length == 0L) VfsUtil.saveText(intentFile, defaultIntentContent(baseName, basePkg, folderName))
+            }
 
             val viewModelName = "${baseName}ViewModel.kt"
             val viewModelFile = screenDir.findChild(viewModelName) ?: screenDir.createChildData(this, viewModelName)

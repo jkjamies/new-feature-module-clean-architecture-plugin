@@ -35,7 +35,8 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
                 useFlowStateHolder = true,
                 useScreenStateHolder = true,
                 diChoice = GenerateScreenDialog.DiChoice.HILT,
-                koinAnnotations = false
+                koinAnnotations = false,
+                patternChoice = GenerateScreenDialog.PatternChoice.MVI
             )
         }
         assertTrue(result.contains("Presentation screen 'Checkout'"))
@@ -86,7 +87,8 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
                 useFlowStateHolder = false,
                 useScreenStateHolder = true,
                 diChoice = com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog.DiChoice.HILT,
-                koinAnnotations = false
+                koinAnnotations = false,
+                patternChoice = com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog.PatternChoice.MVI
             )
         }
 

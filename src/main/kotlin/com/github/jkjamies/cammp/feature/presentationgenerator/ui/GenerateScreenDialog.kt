@@ -32,6 +32,14 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
     private val cbScreen = JBCheckBox("Use Screen StateHolder")
     private val cbNavigation = JBCheckBox("Add Navigation Destination (Navigation Compose)")
 
+    // UI Architecture pattern selection (placed before DI section)
+    private val rbMvvm = JBRadioButton("MVVM", false)
+    private val rbMvi = JBRadioButton("MVI", true)
+    private val patternGroup = ButtonGroup().apply {
+        add(rbMvvm)
+        add(rbMvi)
+    }
+
     private val cbEnableDi = JBCheckBox("Enable Dependency Injection", true)
     private val rbHilt = JBRadioButton("Hilt", true)
     private val rbKoin = JBRadioButton("Koin")
@@ -109,6 +117,7 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
             gridx = 0
             gridy = 0
             insets = JBUI.insets(4)
+            anchor = GridBagConstraints.WEST
         }
 
         fun row(label: String, comp: JComponent) {
@@ -132,27 +141,31 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
         form.add(cbScreen, c); c.gridy += 1
         form.add(cbNavigation, c); c.gridy += 1
 
-        // DI group
-        val diPanel = JPanel(GridBagLayout())
-        val diC = GridBagConstraints().apply {
-            fill = GridBagConstraints.HORIZONTAL
-            weightx = 1.0
-            gridx = 0
-            gridy = 0
-            insets = JBUI.insets(2)
-        }
-        diPanel.add(JBLabel("Dependency Injection:"), diC); diC.gridy += 1
-        // Include/Enable DI master checkbox
-        diPanel.add(cbEnableDi, diC); diC.gridy += 1
+        // UI Architecture Pattern title + options below (full width), order: MVI then MVVM
+        c.gridx = 0; c.gridwidth = 2
+        form.add(JBLabel("UI Architecture Pattern:"), c); c.gridy += 1
+        val patternOptions = JBPanel<JBPanel<*>>()
+        patternOptions.layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
+        patternOptions.add(rbMvi)
+        patternOptions.add(rbMvvm)
+        c.gridx = 0; c.gridwidth = 2
+        form.add(patternOptions, c); c.gridy += 1
+
+        // Dependency Injection title + options below (full width)
+        c.gridx = 0; c.gridwidth = 2
+        form.add(JBLabel("Dependency Injection:"), c); c.gridy += 1
+        val diEnablePanel = JBPanel<JBPanel<*>>()
+        diEnablePanel.layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
+        diEnablePanel.add(cbEnableDi)
+        c.gridx = 0; c.gridwidth = 2
+        form.add(diEnablePanel, c); c.gridy += 1
         val diRow = JBPanel<JBPanel<*>>()
+        diRow.layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
         diRow.add(rbHilt)
         diRow.add(rbKoin)
         diRow.add(cbKoinAnnotations)
-        diPanel.add(diRow, diC); diC.gridy += 1
-
-        c.gridwidth = 2
-        form.add(JSeparator(), c); c.gridy += 1
-        form.add(diPanel, c); c.gridy += 1
+        c.gridx = 0; c.gridwidth = 2
+        form.add(diRow, c); c.gridy += 1
 
         panel.add(form, BorderLayout.CENTER)
         return panel
@@ -211,4 +224,7 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
     enum class DiChoice { HILT, KOIN }
     fun getDiChoice(): DiChoice = if (rbKoin.isSelected) DiChoice.KOIN else DiChoice.HILT
     fun isKoinAnnotationsSelected(): Boolean = cbKoinAnnotations.isSelected
+
+    enum class PatternChoice { MVI, MVVM }
+    fun getPatternChoice(): PatternChoice = if (rbMvvm.isSelected) PatternChoice.MVVM else PatternChoice.MVI
 }
