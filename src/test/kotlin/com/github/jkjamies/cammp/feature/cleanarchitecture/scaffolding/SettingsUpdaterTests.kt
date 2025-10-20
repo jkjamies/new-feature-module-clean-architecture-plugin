@@ -1,5 +1,6 @@
 package com.github.jkjamies.cammp.feature.cleanarchitecture.scaffolding
 
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -15,7 +16,7 @@ class SettingsUpdaterTests : LightPlatformTestCase() {
         val vfRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempRoot)
             ?: error("root VFS not found")
 
-        val settingsFile = com.intellij.openapi.application.WriteAction.compute<VirtualFile, RuntimeException> {
+        val settingsFile = WriteAction.compute<VirtualFile, RuntimeException> {
             val f = vfRoot.createChildData(this, "settings.gradle.kts")
             VfsUtil.saveText(f, "rootProject.name = \"demo\"\n")
             f
@@ -25,7 +26,7 @@ class SettingsUpdaterTests : LightPlatformTestCase() {
         val paths = listOf(":features:payments:domain", ":features:payments:data")
 
         // perform updates twice to verify idempotency
-        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+        WriteAction.run<RuntimeException> {
             updater.updateRootSettingsIncludes(vfRoot.path, paths)
             updater.updateRootSettingsIncludes(vfRoot.path, paths)
         }
@@ -44,7 +45,7 @@ class SettingsUpdaterTests : LightPlatformTestCase() {
         val vfRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempRoot)
             ?: error("root VFS not found")
 
-        val settingsFile = com.intellij.openapi.application.WriteAction.compute<VirtualFile, RuntimeException> {
+        val settingsFile = WriteAction.compute<VirtualFile, RuntimeException> {
             val f = vfRoot.createChildData(this, "settings.gradle")
             VfsUtil.saveText(f, "rootProject.name = 'demo'\n")
             f
@@ -53,7 +54,7 @@ class SettingsUpdaterTests : LightPlatformTestCase() {
         val updater = SettingsUpdater()
         val paths = listOf(":features:catalog:domain", ":features:catalog:data")
 
-        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+        WriteAction.run<RuntimeException> {
             updater.updateRootSettingsIncludes(vfRoot.path, paths)
             updater.updateRootSettingsIncludes(vfRoot.path, paths)
         }

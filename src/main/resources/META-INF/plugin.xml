@@ -6,7 +6,7 @@
     <depends>com.intellij.modules.platform</depends>
 
     <actions>
-        <group id="com.github.jkjamies.cammp.actions.CleanArchitectureGroup"
+        <group id="com.github.jkjamies.cammp.actions.cleanarchitectureGroup"
                text="Clean Architecture"
                description="Tools for Clean Architecture modules"
                popup="true">
@@ -21,6 +21,11 @@
                     class="com.github.jkjamies.cammp.feature.presentationgenerator.actions.GeneratePresentationScreenAction"
                     text="Generate Presentation Screen"
                     description="Create a presentation screen with optional navigation and state holders"/>
+
+            <action id="com.github.jkjamies.cammp.actions.GenerateRepositoryAction"
+                    class="com.github.jkjamies.cammp.feature.repositorygenerator.actions.GenerateRepositoryAction"
+                    text="Generate Repository"
+                    description="Create repository interface in domain and implementation in data module"/>
         </group>
     </actions>
 </idea-plugin>

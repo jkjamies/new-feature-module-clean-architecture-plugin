@@ -1,13 +1,15 @@
 package com.github.jkjamies.cammp.feature.presentationgenerator.scaffolding
 
 import com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.LightPlatformTestCase
 import java.nio.file.Files
 
 /**
- * Verifies PresentationScreenGenerator creates expected directories and files via VfsUtil.
+ * Verifies [PresentationScreenGenerator] creates expected directories and files via VfsUtil.
  */
 class PresentationScreenGeneratorTests : LightPlatformTestCase() {
     fun testGenerateCreatesScreenDirectoryAndFiles() {
@@ -15,7 +17,7 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
         val vfsRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir)
             ?: error("Failed to get VFS for temp dir")
 
-        val presentationDir = com.intellij.openapi.application.WriteAction.compute<com.intellij.openapi.vfs.VirtualFile, RuntimeException> {
+        val presentationDir = WriteAction.compute<VirtualFile, RuntimeException> {
             // simulate feature structure: features/payments/presentation
             val features = VfsUtil.createDirectoryIfMissing(vfsRoot, "features")
                 ?: error("Failed to create features dir")
@@ -26,7 +28,7 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
         }
 
         val generator = PresentationScreenGenerator(project)
-        val result = com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        val result = WriteAction.compute<String, RuntimeException> {
             generator.generate(
                 projectBasePath = vfsRoot.path,
                 targetDirRelativeToProject = "features/payments/presentation",
@@ -63,11 +65,11 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
     }
 
     fun testDirectoryOmitsScreenSuffix() {
-        val tempDir = java.nio.file.Files.createTempDirectory("presentation-generator-test2").toFile()
-        val vfsRoot = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir)
+        val tempDir = Files.createTempDirectory("presentation-generator-test2").toFile()
+        val vfsRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir)
             ?: error("Failed to get VFS for temp dir")
 
-        val presentationDir = com.intellij.openapi.application.WriteAction.compute<com.intellij.openapi.vfs.VirtualFile, RuntimeException> {
+        val presentationDir = WriteAction.compute<VirtualFile, RuntimeException> {
             // simulate feature structure: features/home/presentation
             val features = VfsUtil.createDirectoryIfMissing(vfsRoot, "features")
                 ?: error("Failed to create features dir")
@@ -78,7 +80,7 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
         }
 
         val generator = PresentationScreenGenerator(project)
-        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+        WriteAction.run<RuntimeException> {
             generator.generate(
                 projectBasePath = vfsRoot.path,
                 targetDirRelativeToProject = "features/home/presentation",
@@ -86,9 +88,9 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
                 addNavigation = false,
                 useFlowStateHolder = false,
                 useScreenStateHolder = true,
-                diChoice = com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog.DiChoice.HILT,
+                diChoice = GenerateScreenDialog.DiChoice.HILT,
                 koinAnnotations = false,
-                patternChoice = com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog.PatternChoice.MVI
+                patternChoice = GenerateScreenDialog.PatternChoice.MVI
             )
         }
 

@@ -1,5 +1,6 @@
 package com.github.jkjamies.cammp.feature.cleanarchitecture.util
 
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.testFramework.LightPlatformTestCase
@@ -16,7 +17,7 @@ class FileUtilExtTests : LightPlatformTestCase() {
 
         val name = "sample.txt"
         // VFS mutations must occur inside a write action
-        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+        WriteAction.run<RuntimeException> {
             FileUtilExt.writeFileIfAbsent(vfs, name, "first")
             // second call should be a no-op to preserve original content
             FileUtilExt.writeFileIfAbsent(vfs, name, "second")

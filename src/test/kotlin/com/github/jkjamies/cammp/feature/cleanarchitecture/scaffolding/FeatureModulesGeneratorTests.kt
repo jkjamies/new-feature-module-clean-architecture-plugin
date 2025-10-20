@@ -1,5 +1,6 @@
 package com.github.jkjamies.cammp.feature.cleanarchitecture.scaffolding
 
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.testFramework.LightPlatformTestCase
@@ -16,7 +17,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
 
         val generator = FeatureModulesGenerator(project)
         // generation touches VFS; run in write context
-        val message = com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        val message = WriteAction.compute<String, RuntimeException> {
             generator.generate(projectRootVf.path, "features", "payments")
         }
         assertTrue(message.contains("updated settings.gradle"))
@@ -43,7 +44,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
             ?: error("project root VFS not found")
 
         val generator = FeatureModulesGenerator(project)
-        com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        WriteAction.compute<String, RuntimeException> {
             generator.generate(projectRootVf.path, "features", "orders", includePresentation = false)
         }
 
@@ -69,12 +70,12 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
     }
 
     fun testGenerateWithCombinedDatasourceCreatesDataSourceModule() {
-        val tempProject = java.nio.file.Files.createTempDirectory("feature-generator-test-combined").toFile()
-        val projectRootVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+        val tempProject = Files.createTempDirectory("feature-generator-test-combined").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
             ?: error("project root VFS not found")
 
         val generator = FeatureModulesGenerator(project)
-        com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        WriteAction.compute<String, RuntimeException> {
             generator.generate(
                 projectRootVf.path,
                 "features",
@@ -87,7 +88,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
             )
         }
 
-        val featureDir = com.intellij.openapi.vfs.VfsUtil.findRelativeFile("features/catalog", projectRootVf)
+        val featureDir = VfsUtil.findRelativeFile("features/catalog", projectRootVf)
             ?: error("Feature dir not created")
 
         // base modules
@@ -108,7 +109,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNull(dataPkgDir.findChild("localDataSource"))
 
         val settingsFile = projectRootVf.findChild("settings.gradle.kts") ?: error("settings file not created")
-        val content = com.intellij.openapi.vfs.VfsUtil.loadText(settingsFile)
+        val content = VfsUtil.loadText(settingsFile)
         val expectedIncludes = listOf("domain", "data", "di", "presentation", "dataSource")
         expectedIncludes.forEach { m ->
             val line = "include(\":features:catalog:$m\")"
@@ -117,12 +118,12 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
     }
 
     fun testGenerateWithRemoteAndLocalDatasourceCreatesBothSpecificModules() {
-        val tempProject = java.nio.file.Files.createTempDirectory("feature-generator-test-remote-local").toFile()
-        val projectRootVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+        val tempProject = Files.createTempDirectory("feature-generator-test-remote-local").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
             ?: error("project root VFS not found")
 
         val generator = FeatureModulesGenerator(project)
-        com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        WriteAction.compute<String, RuntimeException> {
             generator.generate(
                 projectRootVf.path,
                 "features",
@@ -135,7 +136,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
             )
         }
 
-        val featureDir = com.intellij.openapi.vfs.VfsUtil.findRelativeFile("features/account", projectRootVf)
+        val featureDir = VfsUtil.findRelativeFile("features/account", projectRootVf)
             ?: error("Feature dir not created")
 
         // base modules
@@ -156,7 +157,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNull(dataPkgDir.findChild("dataSource"))
 
         val settingsFile = projectRootVf.findChild("settings.gradle.kts") ?: error("settings file not created")
-        val content = com.intellij.openapi.vfs.VfsUtil.loadText(settingsFile)
+        val content = VfsUtil.loadText(settingsFile)
         listOf("domain", "data", "di", "remoteDataSource", "localDataSource").forEach { m ->
             val line = "include(\":features:account:$m\")"
             assertTrue("Missing include for $m", content.contains(line))
@@ -165,12 +166,12 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
     }
 
     fun testGenerateWithRemoteOnlyCreatesRemoteDataSourceModule() {
-        val tempProject = java.nio.file.Files.createTempDirectory("feature-generator-test-remote-only").toFile()
-        val projectRootVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+        val tempProject = Files.createTempDirectory("feature-generator-test-remote-only").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
             ?: error("project root VFS not found")
 
         val generator = FeatureModulesGenerator(project)
-        com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        WriteAction.compute<String, RuntimeException> {
             generator.generate(
                 projectRootVf.path,
                 "features",
@@ -183,7 +184,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
             )
         }
 
-        val featureDir = com.intellij.openapi.vfs.VfsUtil.findRelativeFile("features/search", projectRootVf)
+        val featureDir = VfsUtil.findRelativeFile("features/search", projectRootVf)
             ?: error("Feature dir not created")
 
         assertNotNull(featureDir.findChild("remoteDataSource"))
@@ -198,19 +199,19 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNull(dataPkgDirRemote.findChild("localDataSource"))
         assertNull(dataPkgDirRemote.findChild("dataSource"))
 
-        val content = com.intellij.openapi.vfs.VfsUtil.loadText(projectRootVf.findChild("settings.gradle.kts")!!)
+        val content = VfsUtil.loadText(projectRootVf.findChild("settings.gradle.kts")!!)
         assertTrue(content.contains("include(\":features:search:remoteDataSource\")"))
         assertFalse(content.contains("include(\":features:search:localDataSource\")"))
         assertFalse(content.contains("include(\":features:search:dataSource\")"))
     }
 
     fun testGenerateWithLocalOnlyCreatesLocalDataSourceModule() {
-        val tempProject = java.nio.file.Files.createTempDirectory("feature-generator-test-local-only").toFile()
-        val projectRootVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+        val tempProject = Files.createTempDirectory("feature-generator-test-local-only").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
             ?: error("project root VFS not found")
 
         val generator = FeatureModulesGenerator(project)
-        com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        WriteAction.compute<String, RuntimeException> {
             generator.generate(
                 projectRootVf.path,
                 "features",
@@ -223,7 +224,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
             )
         }
 
-        val featureDir = com.intellij.openapi.vfs.VfsUtil.findRelativeFile("features/prefs", projectRootVf)
+        val featureDir = VfsUtil.findRelativeFile("features/prefs", projectRootVf)
             ?: error("Feature dir not created")
 
         assertNotNull(featureDir.findChild("localDataSource"))
@@ -238,19 +239,19 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNull(dataPkgDirLocal.findChild("remoteDataSource"))
         assertNull(dataPkgDirLocal.findChild("dataSource"))
 
-        val content = com.intellij.openapi.vfs.VfsUtil.loadText(projectRootVf.findChild("settings.gradle.kts")!!)
+        val content = VfsUtil.loadText(projectRootVf.findChild("settings.gradle.kts")!!)
         assertTrue(content.contains("include(\":features:prefs:localDataSource\")"))
         assertFalse(content.contains("include(\":features:prefs:remoteDataSource\")"))
         assertFalse(content.contains("include(\":features:prefs:dataSource\")"))
     }
 
     fun testGenerateWithoutDiExcludesDiModule() {
-        val tempProject = java.nio.file.Files.createTempDirectory("feature-generator-test-nodi").toFile()
-        val projectRootVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+        val tempProject = Files.createTempDirectory("feature-generator-test-nodi").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
             ?: error("project root VFS not found")
 
         val generator = FeatureModulesGenerator(project)
-        com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        WriteAction.compute<String, RuntimeException> {
             generator.generate(
                 projectRootVf.path,
                 "features",
@@ -264,7 +265,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
             )
         }
 
-        val featureDir = com.intellij.openapi.vfs.VfsUtil.findRelativeFile("features/billing", projectRootVf)
+        val featureDir = VfsUtil.findRelativeFile("features/billing", projectRootVf)
             ?: error("Feature dir not created")
 
         // base modules except di
@@ -275,7 +276,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertNotNull("presentation module missing", featureDir.findChild("presentation"))
 
         val settingsFile = projectRootVf.findChild("settings.gradle.kts") ?: error("settings file not created")
-        val content = com.intellij.openapi.vfs.VfsUtil.loadText(settingsFile)
+        val content = VfsUtil.loadText(settingsFile)
         assertTrue(content.contains("include(\":features:billing:domain\")"))
         assertTrue(content.contains("include(\":features:billing:data\")"))
         assertTrue(content.contains("include(\":features:billing:presentation\")"))

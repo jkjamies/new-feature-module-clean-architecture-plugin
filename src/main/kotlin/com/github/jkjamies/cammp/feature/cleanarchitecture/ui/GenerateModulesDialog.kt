@@ -1,7 +1,10 @@
 package com.github.jkjamies.cammp.feature.cleanarchitecture.ui
 
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.TextComponentAccessor
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
@@ -17,7 +20,12 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.event.DocumentEvent
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.vfs.LocalFileSystem
+import java.awt.Dimension
+import java.awt.event.ItemListener
 import java.nio.file.Paths
+import javax.swing.JTextField
+import javax.swing.SwingConstants
 
 /**
  * Dialog used by the action to capture the root features folder and the feature name.
@@ -27,7 +35,7 @@ import java.nio.file.Paths
  */
 class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     private val projectBasePath: String? = project.basePath
-    private val rootField = com.intellij.openapi.ui.TextFieldWithBrowseButton(JBTextField())
+    private val rootField = TextFieldWithBrowseButton(JBTextField())
     private val featureField = JBTextField()
     // Organization segmented UI: left label "com.", center input, right dynamic label
     private val orgLeftLabel = JBLabel("com.")
@@ -99,10 +107,10 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         // Moved to private method for readability
         // Configure directory chooser scoped to project base
         run {
-            val descriptor = com.intellij.openapi.fileChooser.FileChooserDescriptorFactory.createSingleFolderDescriptor()
+            val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
             val basePath = projectBasePath
             if (basePath != null) {
-                val baseVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
+                val baseVf = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
                 if (baseVf != null) descriptor.withRoots(baseVf)
             }
             rootField.addBrowseFolderListener(
@@ -110,13 +118,13 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
                 null,
                 project,
                 descriptor,
-                object : com.intellij.openapi.ui.TextComponentAccessor<javax.swing.JTextField> {
-                    override fun getText(component: javax.swing.JTextField): String {
+                object : TextComponentAccessor<JTextField> {
+                    override fun getText(component: JTextField): String {
                         val t = component.text
                         val base = projectBasePath
                         return if (t.isNullOrBlank() && base != null) base else t
                     }
-                    override fun setText(component: javax.swing.JTextField, text: String) {
+                    override fun setText(component: JTextField, text: String) {
                         component.text = text
                     }
                 }
@@ -158,7 +166,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             }
             updateDatasourceStates()
         }
-        val remoteLocalListener = java.awt.event.ItemListener {
+        val remoteLocalListener = ItemListener {
             if (adjustingDatasourceSelections) return@ItemListener
             val anySelected = remoteDatasourceCheckBox.isSelected || localDatasourceCheckBox.isSelected
             if (anySelected) {
@@ -263,10 +271,10 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             val fm = orgRightLabel.getFontMetrics(orgRightLabel.font)
             val w = fm.stringWidth(maxSample) + JBUI.scale(8)
             val h = orgRightLabel.preferredSize.height
-            orgRightLabel.horizontalAlignment = javax.swing.SwingConstants.LEFT
+            orgRightLabel.horizontalAlignment = SwingConstants.LEFT
             val rightPreviewContainer = JPanel(BorderLayout()).apply {
-                preferredSize = java.awt.Dimension(w, h)
-                minimumSize = java.awt.Dimension(w, h)
+                preferredSize = Dimension(w, h)
+                minimumSize = Dimension(w, h)
                 add(orgRightLabel, BorderLayout.CENTER)
             }
             add(rightPreviewContainer, BorderLayout.EAST)

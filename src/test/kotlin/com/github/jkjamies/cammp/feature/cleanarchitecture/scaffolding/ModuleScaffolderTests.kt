@@ -1,7 +1,9 @@
 package com.github.jkjamies.cammp.feature.cleanarchitecture.scaffolding
 
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.LightPlatformTestCase
 import java.nio.file.Files
 
@@ -15,12 +17,12 @@ class ModuleScaffolderTests : LightPlatformTestCase() {
             ?: error("Failed to get VFS for temp dir")
 
         // create test domain module directory inside a write action
-        val domainDir = com.intellij.openapi.application.WriteAction.compute<com.intellij.openapi.vfs.VirtualFile, RuntimeException> {
+        val domainDir = WriteAction.compute<VirtualFile, RuntimeException> {
             VfsUtil.createDirectoryIfMissing(vfs, "domain") ?: error("Failed to create domain module dir")
         }
 
         val scaffolder = ModuleScaffolder()
-        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+        WriteAction.run<RuntimeException> {
             scaffolder.scaffoldModule(domainDir, "domain", "features", "payments", "jkjamies")
         }
 
@@ -39,10 +41,10 @@ class ModuleScaffolderTests : LightPlatformTestCase() {
         assertNotNull(domainPkgDir.findChild("usecase"))
 
         // create test data module and scaffold
-        val dataDir = com.intellij.openapi.application.WriteAction.compute<com.intellij.openapi.vfs.VirtualFile, RuntimeException> {
+        val dataDir = WriteAction.compute<VirtualFile, RuntimeException> {
             VfsUtil.createDirectoryIfMissing(vfs, "data") ?: error("Failed to create data module dir")
         }
-        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+        WriteAction.run<RuntimeException> {
             scaffolder.scaffoldModule(dataDir, "data", "features", "payments", "jkjamies")
         }
         val dataPkgPath = "src/main/kotlin/com/jkjamies/features/payments/data"

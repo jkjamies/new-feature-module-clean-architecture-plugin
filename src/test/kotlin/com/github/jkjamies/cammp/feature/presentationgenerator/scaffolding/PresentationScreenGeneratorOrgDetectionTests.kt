@@ -1,13 +1,15 @@
 package com.github.jkjamies.cammp.feature.presentationgenerator.scaffolding
 
 import com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.LightPlatformTestCase
 import java.nio.file.Files
 
 /**
- * Verifies that PresentationScreenGenerator detects the existing organization segment
+ * Verifies that [PresentationScreenGenerator] detects the existing organization segment
  * from sibling modules and does not fallback to the default when a package exists.
  */
 class PresentationScreenGeneratorOrgDetectionTests : LightPlatformTestCase() {
@@ -17,7 +19,7 @@ class PresentationScreenGeneratorOrgDetectionTests : LightPlatformTestCase() {
             ?: error("Failed to get VFS for temp dir")
 
         // Create features/payments with sibling domain and presentation modules.
-        val (featureDir, presentationDir) = com.intellij.openapi.application.WriteAction.compute<Pair<com.intellij.openapi.vfs.VirtualFile, com.intellij.openapi.vfs.VirtualFile>, RuntimeException> {
+        val (featureDir, presentationDir) = WriteAction.compute<Pair<VirtualFile, VirtualFile>, RuntimeException> {
             val features = VfsUtil.createDirectoryIfMissing(vfsRoot, "features")
                 ?: error("Failed to create features dir")
             val feature = VfsUtil.createDirectoryIfMissing(features, "payments")
@@ -36,7 +38,7 @@ class PresentationScreenGeneratorOrgDetectionTests : LightPlatformTestCase() {
         }
 
         val generator = PresentationScreenGenerator(project)
-        val result = com.intellij.openapi.application.WriteAction.compute<String, RuntimeException> {
+        val result = WriteAction.compute<String, RuntimeException> {
             generator.generate(
                 projectBasePath = vfsRoot.path,
                 targetDirRelativeToProject = "features/${featureDir.name}/${presentationDir.name}",
@@ -45,7 +47,8 @@ class PresentationScreenGeneratorOrgDetectionTests : LightPlatformTestCase() {
                 useFlowStateHolder = false,
                 useScreenStateHolder = true,
                 diChoice = GenerateScreenDialog.DiChoice.HILT,
-                koinAnnotations = false
+                koinAnnotations = false,
+                patternChoice = GenerateScreenDialog.PatternChoice.MVI
             )
         }
         assertTrue(result.contains("Presentation screen 'Checkout'"))

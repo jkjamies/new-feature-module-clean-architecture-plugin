@@ -1,8 +1,10 @@
 package com.github.jkjamies.cammp.feature.presentationgenerator.ui
 
-import com.intellij.testFramework.LightPlatformTestCase
 import junit.framework.TestCase
 
+/**
+ * Tests for [GenerateScreenDialog].
+ */
 class GenerateScreenDialogTests : TestCase() {
     fun testDiChoiceEnum() {
         val values = GenerateScreenDialog.DiChoice.values()

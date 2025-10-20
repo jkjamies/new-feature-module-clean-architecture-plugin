@@ -1,13 +1,15 @@
 package com.github.jkjamies.cammp.feature.presentationgenerator.scaffolding
 
 import com.github.jkjamies.cammp.feature.presentationgenerator.ui.GenerateScreenDialog
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.LightPlatformTestCase
 import java.nio.file.Files
 
 /**
- * Verifies Intent file is generated only for MVI pattern and omitted for MVVM.
+ * Verifies [PresentationScreenGenerator] Intent file is generated only for MVI pattern and omitted for MVVM.
  */
 class PresentationScreenGeneratorPatternTests : LightPlatformTestCase() {
     fun testNoIntentForMvvmPattern() {
@@ -15,7 +17,7 @@ class PresentationScreenGeneratorPatternTests : LightPlatformTestCase() {
         val vfsRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempDir)
             ?: error("Failed to get VFS for temp dir")
 
-        val presentationDir = com.intellij.openapi.application.WriteAction.compute<com.intellij.openapi.vfs.VirtualFile, RuntimeException> {
+        val presentationDir = WriteAction.compute<VirtualFile, RuntimeException> {
             val features = VfsUtil.createDirectoryIfMissing(vfsRoot, "features")
                 ?: error("Failed to create features dir")
             val feature = VfsUtil.createDirectoryIfMissing(features, "profile")
@@ -25,7 +27,7 @@ class PresentationScreenGeneratorPatternTests : LightPlatformTestCase() {
         }
 
         val generator = PresentationScreenGenerator(project)
-        com.intellij.openapi.application.WriteAction.run<RuntimeException> {
+        WriteAction.run<RuntimeException> {
             generator.generate(
                 projectBasePath = vfsRoot.path,
                 targetDirRelativeToProject = "features/profile/presentation",

@@ -1,6 +1,15 @@
 package com.github.jkjamies.cammp.feature.cleanarchitecture.ui
 
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.testFramework.LightPlatformTestCase
+import com.intellij.testFramework.PlatformTestUtil
+import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBRadioButton
+import com.intellij.ui.components.JBTextField
+import java.awt.Component
+import java.io.File
+import java.nio.file.Paths
 
 /**
  * Verifies the behavior of [GenerateModulesDialog], including default values and title.
@@ -9,17 +18,17 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
     fun testRootFieldShowsAbsoluteProjectPathAndValidatesOutside() {
         val dialog = GenerateModulesDialog(project)
         val rootField = dialog.javaClass.getDeclaredField("rootField").apply { isAccessible = true }
-        val rootBrowse = rootField.get(dialog) as com.intellij.openapi.ui.TextFieldWithBrowseButton
+        val rootBrowse = rootField.get(dialog) as TextFieldWithBrowseButton
         val tf = rootBrowse.textField
 
         val base = project.basePath ?: return
         // Set to absolute path under project -> should remain absolute (no normalization)
         tf.text = base + "/features"
-        com.intellij.testFramework.PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
         assertEquals(base + "/features", rootBrowse.text)
 
         // Outside project absolute path should cause validation error
-        val parent = java.io.File(base).parentFile?.absolutePath ?: return
+        val parent = File(base).parentFile?.absolutePath ?: return
         val outside = parent + "/outside-folder"
         tf.text = outside
 
@@ -40,13 +49,13 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
         val featureField = dialog.javaClass.getDeclaredField("featureField").apply { isAccessible = true }
         val orgCenterField = dialog.javaClass.getDeclaredField("orgCenterField").apply { isAccessible = true }
 
-        val rootBrowse = rootField.get(dialog) as com.intellij.openapi.ui.TextFieldWithBrowseButton
+        val rootBrowse = rootField.get(dialog) as TextFieldWithBrowseButton
         val rootTextField = rootBrowse.textField
-        val featureTextField = featureField.get(dialog) as com.intellij.ui.components.JBTextField
-        val orgCenterTextField = orgCenterField.get(dialog) as com.intellij.ui.components.JBTextField
+        val featureTextField = featureField.get(dialog) as JBTextField
+        val orgCenterTextField = orgCenterField.get(dialog) as JBTextField
 
         // default org should be last segment of the project root
-        val expectedOrg = java.nio.file.Paths.get(base).fileName?.toString() ?: ""
+        val expectedOrg = Paths.get(base).fileName?.toString() ?: ""
         assertEquals(expectedOrg, dialog.getOrgSegment())
 
         // leading/trailing spaces should be trimmed by getters
@@ -74,16 +83,16 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
 
         // Access private panel to check visibility via reflection
         val optionsPanelField = dialog.javaClass.getDeclaredField("datasourceOptionsPanel").apply { isAccessible = true }
-        val optionsPanel = optionsPanelField.get(dialog) as java.awt.Component
+        val optionsPanel = optionsPanelField.get(dialog) as Component
         assertTrue(optionsPanel.isVisible)
 
         // Access datasource option checkboxes
         val combinedField = dialog.javaClass.getDeclaredField("combinedDatasourceCheckBox").apply { isAccessible = true }
         val remoteField = dialog.javaClass.getDeclaredField("remoteDatasourceCheckBox").apply { isAccessible = true }
         val localField = dialog.javaClass.getDeclaredField("localDatasourceCheckBox").apply { isAccessible = true }
-        val combined = combinedField.get(dialog) as com.intellij.ui.components.JBCheckBox
-        val remote = remoteField.get(dialog) as com.intellij.ui.components.JBCheckBox
-        val local = localField.get(dialog) as com.intellij.ui.components.JBCheckBox
+        val combined = combinedField.get(dialog) as JBCheckBox
+        val remote = remoteField.get(dialog) as JBCheckBox
+        val local = localField.get(dialog) as JBCheckBox
 
         // When include is off, all options are disabled and unselected
         assertFalse(combined.isSelected)
@@ -95,7 +104,7 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
 
         // Now enable include datasource
         val includeDatasourceField = dialog.javaClass.getDeclaredField("includeDatasourceCheckBox").apply { isAccessible = true }
-        val includeDatasourceCheckbox = includeDatasourceField.get(dialog) as com.intellij.ui.components.JBCheckBox
+        val includeDatasourceCheckbox = includeDatasourceField.get(dialog) as JBCheckBox
         includeDatasourceCheckbox.isSelected = true
 
         // By default when enabled: remote and local are selected, combined is not and all are enabled
@@ -150,15 +159,15 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
 
         // Access DI options panel and radio buttons via reflection
         val diPanelField = dialog.javaClass.getDeclaredField("diOptionsPanel").apply { isAccessible = true }
-        val diPanel = diPanelField.get(dialog) as java.awt.Component
+        val diPanel = diPanelField.get(dialog) as Component
         assertTrue(diPanel.isVisible)
 
         val hiltField = dialog.javaClass.getDeclaredField("diHiltRadioButton").apply { isAccessible = true }
         val koinField = dialog.javaClass.getDeclaredField("diKoinRadioButton").apply { isAccessible = true }
         val koinAnnotationsField = dialog.javaClass.getDeclaredField("koinAnnotationsCheckBox").apply { isAccessible = true }
-        val hilt = hiltField.get(dialog) as com.intellij.ui.components.JBRadioButton
-        val koin = koinField.get(dialog) as com.intellij.ui.components.JBRadioButton
-        val koinAnnotations = koinAnnotationsField.get(dialog) as com.intellij.ui.components.JBCheckBox
+        val hilt = hiltField.get(dialog) as JBRadioButton
+        val koin = koinField.get(dialog) as JBRadioButton
+        val koinAnnotations = koinAnnotationsField.get(dialog) as JBCheckBox
 
         // Defaults when enabled: Hilt selected, Koin not; with radio buttons both remain enabled
         assertTrue(hilt.isSelected)
@@ -181,7 +190,7 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
 
         // Disable Include DI: both options become unselected and disabled, and Koin annotations hidden and cleared
         val includeDiField = dialog.javaClass.getDeclaredField("includeDiCheckBox").apply { isAccessible = true }
-        val includeDiCheckbox = includeDiField.get(dialog) as com.intellij.ui.components.JBCheckBox
+        val includeDiCheckbox = includeDiField.get(dialog) as JBCheckBox
         includeDiCheckbox.isSelected = false
         assertFalse(hilt.isSelected)
         assertFalse(koin.isSelected)
@@ -212,14 +221,14 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
         // Access platform radios
         val androidField = dialog.javaClass.getDeclaredField("platformAndroidRadioButton").apply { isAccessible = true }
         val kmpField = dialog.javaClass.getDeclaredField("platformKmpRadioButton").apply { isAccessible = true }
-        val android = androidField.get(dialog) as com.intellij.ui.components.JBRadioButton
-        val kmp = kmpField.get(dialog) as com.intellij.ui.components.JBRadioButton
+        val android = androidField.get(dialog) as JBRadioButton
+        val kmp = kmpField.get(dialog) as JBRadioButton
 
         // Access DI radios
         val hiltField = dialog.javaClass.getDeclaredField("diHiltRadioButton").apply { isAccessible = true }
         val koinField = dialog.javaClass.getDeclaredField("diKoinRadioButton").apply { isAccessible = true }
-        val hilt = hiltField.get(dialog) as com.intellij.ui.components.JBRadioButton
-        val koin = koinField.get(dialog) as com.intellij.ui.components.JBRadioButton
+        val hilt = hiltField.get(dialog) as JBRadioButton
+        val koin = koinField.get(dialog) as JBRadioButton
 
         // Defaults: Android selected, DI enabled, Hilt selected and both enabled
         assertTrue(android.isSelected)
@@ -259,14 +268,14 @@ class GenerateModulesDialogTests : LightPlatformTestCase() {
         val featureField = dialog.javaClass.getDeclaredField("featureField").apply { isAccessible = true }
         val orgRightLabelField = dialog.javaClass.getDeclaredField("orgRightLabel").apply { isAccessible = true }
 
-        val rootBrowse = rootField.get(dialog) as com.intellij.openapi.ui.TextFieldWithBrowseButton
-        val featureTf = featureField.get(dialog) as com.intellij.ui.components.JBTextField
-        val rightLabel = orgRightLabelField.get(dialog) as com.intellij.ui.components.JBLabel
+        val rootBrowse = rootField.get(dialog) as TextFieldWithBrowseButton
+        val featureTf = featureField.get(dialog) as JBTextField
+        val rightLabel = orgRightLabelField.get(dialog) as JBLabel
 
         // Set root to project base and feature to 'foo' and ensure preview omits root
         rootBrowse.text = base
         featureTf.text = "foo"
-        com.intellij.testFramework.PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
 
         val text = rightLabel.text
         assertTrue("Preview should omit root when equals project base", text.startsWith(".foo.{"))
