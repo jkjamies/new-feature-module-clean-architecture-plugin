@@ -21,6 +21,7 @@ class GenerateUseCaseAction : AnAction("Generate UseCase") {
         val diEnabled = dialog.isDiEnabled()
         val useHilt = dialog.isHiltSelected()
         val koinAnnotations = dialog.isKoinAnnotationsSelected()
+        val selectedRepositories = dialog.getSelectedRepositories()
 
         val basePath = project.basePath ?: run {
             Messages.showErrorDialog(project, "Project base path not found", "Error")
@@ -45,13 +46,13 @@ class GenerateUseCaseAction : AnAction("Generate UseCase") {
                     useCaseName = useCaseName,
                     diEnabled = diEnabled,
                     useHilt = useHilt,
-                    koinAnnotations = koinAnnotations
+                    koinAnnotations = koinAnnotations,
+                    selectedRepositories = selectedRepositories
                 )
                 Messages.showInfoMessage(project, result, "Success")
             } catch (t: Throwable) {
-                Messages.showErrorDialog(project, "Failed to generate use case: ${t.message}", "Error")
+                Messages.showErrorDialog(project, "Failed to generate usecase: ${t.message}", "Error")
             }
         }
     }
 }
-

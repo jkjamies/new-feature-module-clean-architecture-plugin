@@ -29,8 +29,8 @@
 
             <action id="com.github.jkjamies.cammp.actions.GenerateUseCaseAction"
                     class="com.github.jkjamies.cammp.feature.usecasegenerator.actions.GenerateUseCaseAction"
-                    text="Generate Use Case"
-                    description="Create a use case in the domain module"/>
+                    text="Generate UseCase"
+                    description="Create a usecase in the domain module"/>
         </group>
     </actions>
 </idea-plugin>

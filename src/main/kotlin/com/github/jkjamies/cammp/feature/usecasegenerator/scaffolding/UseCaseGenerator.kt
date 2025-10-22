@@ -55,7 +55,8 @@ class UseCaseGenerator(@Suppress("unused") private val project: Project) {
         useCaseName: String,
         diEnabled: Boolean = true,
         useHilt: Boolean = true,
-        koinAnnotations: Boolean = false
+        koinAnnotations: Boolean = false,
+        selectedRepositories: List<String> = emptyList()
     ): String {
         val lfs = LocalFileSystem.getInstance()
         val baseDir = lfs.refreshAndFindFileByPath(projectBasePath)
@@ -80,16 +81,43 @@ class UseCaseGenerator(@Suppress("unused") private val project: Project) {
             ?: error("Failed to create package directory: $domainPkgRel")
 
         val domainBasePkg = "com.$orgSegment.$rootDirName.$featureName.domain.usecase"
+        val repoBasePkg = "com.$orgSegment.$rootDirName.$featureName.domain.repository"
 
-        val simpleName = useCaseName.replaceFirstChar { it.titlecase(Locale.getDefault()) }
-        val fileName = "$simpleName.kt"
+        val normalizedName = useCaseName.trim().let { raw ->
+            val capped = raw.replaceFirstChar { it.titlecase(Locale.getDefault()) }
+            if (capped.endsWith("UseCase", ignoreCase = true)) capped else capped + "UseCase"
+        }
+        val fileName = "$normalizedName.kt"
         val file = domainPkgDir.findChild(fileName) ?: domainPkgDir.createChildData(this, fileName)
         if (file.length == 0L) {
             val content = if (diEnabled && useHilt) {
-                renderTemplate("UseCase.kt", mapOf(
-                    "PACKAGE" to domainBasePkg,
-                    "USECASE_NAME" to simpleName
-                ))
+                data class RepoRef(val simple: String, val fqn: String)
+                val repoRefs = selectedRepositories.mapNotNull { sel ->
+                    if (sel.isBlank()) null else {
+                        if (sel.contains('.')) {
+                            val simple = sel.substringAfterLast('.')
+                            RepoRef(simple, sel)
+                        } else {
+                            RepoRef(sel, "$repoBasePkg.$sel")
+                        }
+                    }
+                }
+                val imports = if (repoRefs.isNotEmpty()) repoRefs.joinToString("\n") { "import ${it.fqn}" } else ""
+                val constructorParams = if (repoRefs.isNotEmpty())
+                    repoRefs.joinToString(",\n    ") { r ->
+                        val param = r.simple.replaceFirstChar { it.lowercase(Locale.getDefault()) }
+                        "private val $param: ${r.simple}"
+                    }
+                else ""
+                renderTemplate(
+                    "UseCase.kt",
+                    mapOf(
+                        "PACKAGE" to domainBasePkg,
+                        "USECASE_NAME" to normalizedName,
+                        "IMPORTS" to imports,
+                        "CONSTRUCTOR_PARAMS" to constructorParams
+                    )
+                )
             } else {
                 "// TODO: not yet available"
             }
@@ -97,6 +125,6 @@ class UseCaseGenerator(@Suppress("unused") private val project: Project) {
         }
 
         domainModuleDir.refresh(true, true)
-        return "Use case '$simpleName' generated in domain module."
+        return "UseCase '$normalizedName' generated in domain module."
     }
 }

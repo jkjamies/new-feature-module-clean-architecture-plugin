@@ -4,7 +4,9 @@ import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.*
@@ -20,8 +22,7 @@ import javax.swing.event.DocumentEvent
  * Dialog to gather inputs for generating a repository across domain and data modules.
  */
 class GenerateRepositoryDialog(private val project: Project) : DialogWrapper(project) {
-    private val dirField = JBTextField()
-    private val chooseButton = JButton("Choose...")
+    private val dirField = TextFieldWithBrowseButton(JBTextField())
     private val nameField = JBTextField()
 
     // DI controls
@@ -40,25 +41,28 @@ class GenerateRepositoryDialog(private val project: Project) : DialogWrapper(pro
 
         project.basePath?.let { dirField.text = it }
 
-        chooseButton.addActionListener {
+        // Configure directory chooser scoped to project base
+        run {
             val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
             val basePath = project.basePath
             if (basePath != null) {
-                val baseVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
+                val baseVf = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
                 if (baseVf != null) descriptor.withRoots(baseVf)
             }
-            val currentText = dirField.text
-            val toSelectPath = if (currentText.isNullOrBlank()) basePath else currentText
-            val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
-            val file = FileChooser.chooseFile(descriptor, project, toSelect)
-            if (file != null) {
-                dirField.text = file.path
-                userInteracted = true
-                updateOkAndError()
+            dirField.addActionListener {
+                val currentText = dirField.text
+                val toSelectPath = if (currentText.isNullOrBlank()) project.basePath else currentText
+                val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
+                val file = FileChooser.chooseFile(descriptor, project, toSelect)
+                if (file != null) {
+                    dirField.text = file.path
+                    userInteracted = true
+                    updateOkAndError()
+                }
             }
         }
 
-        dirField.document.addDocumentListener(object : DocumentAdapter() {
+        dirField.textField.document.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
                 userInteracted = true
                 updateOkAndError()
@@ -105,12 +109,7 @@ class GenerateRepositoryDialog(private val project: Project) : DialogWrapper(pro
             c.gridy += 1
         }
 
-        val dirPanel = JPanel(BorderLayout()).apply {
-            add(dirField, BorderLayout.CENTER)
-            add(chooseButton, BorderLayout.EAST)
-        }
-
-        row("Data module directory:", dirPanel)
+        row("Data module directory:", dirField)
         row("Repository name:", nameField)
 
         // Dependency Injection title + options below (full width), aligned like presentation dialog

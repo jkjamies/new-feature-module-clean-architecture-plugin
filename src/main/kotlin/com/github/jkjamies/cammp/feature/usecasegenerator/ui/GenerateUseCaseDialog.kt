@@ -4,8 +4,11 @@ import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.*
 import com.intellij.util.ui.JBUI
@@ -14,15 +17,14 @@ import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.nio.file.Paths
 import javax.swing.ButtonGroup
-import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.event.DocumentEvent
 
 class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(project) {
-    private val dirField = JBTextField()
-    private val chooseButton = JButton("Choose...")
+    private val dirField = TextFieldWithBrowseButton(JBTextField())
     private val nameField = JBTextField()
+    private val namePreviewLabel = JBLabel()
 
     // DI controls (same UI as others)
     private val cbEnableDi = JBCheckBox("Enable Dependency Injection", true)
@@ -30,36 +32,50 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
     private val rbKoin = JBRadioButton("Koin")
     private val cbKoinAnnotations = JBCheckBox("Koin Annotations")
 
+    // Repositories selection UI
+    private val reposPanel = JPanel()
+    private val reposScroll = JBScrollPane(reposPanel).apply {
+        preferredSize = JBUI.size(600, 140)
+        minimumSize = JBUI.size(400, 100)
+        border = JBUI.Borders.empty()
+    }
+    private val repoCheckboxes = mutableListOf<Pair<JBCheckBox, String>>() // checkbox to FQN
+
     private var userInteracted: Boolean = false
 
     init {
-        title = "Generate Use Case"
+        title = "Generate UseCase"
         isResizable = true
         init()
 
         project.basePath?.let { dirField.text = it }
 
-        chooseButton.addActionListener {
+        // Configure directory chooser scoped to project base
+        run {
             val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
             val basePath = project.basePath
             if (basePath != null) {
-                val baseVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
+                val baseVf = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
                 if (baseVf != null) descriptor.withRoots(baseVf)
             }
-            val currentText = dirField.text
-            val toSelectPath = if (currentText.isNullOrBlank()) basePath else currentText
-            val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
-            val file = FileChooser.chooseFile(descriptor, project, toSelect)
-            if (file != null) {
-                dirField.text = file.path
-                userInteracted = true
-                updateOkAndError()
+            dirField.addActionListener {
+                val currentText = dirField.text
+                val toSelectPath = if (currentText.isNullOrBlank()) project.basePath else currentText
+                val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
+                val file = FileChooser.chooseFile(descriptor, project, toSelect)
+                if (file != null) {
+                    dirField.text = file.path
+                    userInteracted = true
+                    refreshRepositories()
+                    updateOkAndError()
+                }
             }
         }
 
-        dirField.document.addDocumentListener(object : DocumentAdapter() {
+        dirField.textField.document.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
                 userInteracted = true
+                refreshRepositories()
                 updateOkAndError()
             }
         })
@@ -67,6 +83,7 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
             override fun textChanged(e: DocumentEvent) {
                 userInteracted = true
                 updateOkAndError()
+                updateNamePreview()
             }
         })
 
@@ -79,12 +96,16 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
         rbHilt.addItemListener { updateDiControls() }
         updateDiControls()
 
+        // initial scan
+        refreshRepositories()
         updateOkAndError()
+        updateNamePreview()
     }
 
     override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout())
-        panel.preferredSize = JBUI.size(780, 280)
+        panel.preferredSize = JBUI.size(1100, 400)
+        panel.minimumSize = JBUI.size(900, 400)
         val form = JPanel(GridBagLayout())
         val c = GridBagConstraints().apply {
             fill = GridBagConstraints.HORIZONTAL
@@ -103,12 +124,23 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
             c.gridy += 1
         }
 
-        val dirPanel = JPanel(BorderLayout()).apply {
-            add(dirField, BorderLayout.CENTER)
-            add(chooseButton, BorderLayout.EAST)
-        }
-        row("Domain module directory:", dirPanel)
-        row("Use case name:", nameField)
+        // Directory and name rows
+        row("Domain module directory:", dirField)
+        row("UseCase name (\"UseCase\" will be appended):", nameField)
+        // Name preview row (full width)
+        c.gridx = 0; c.gridwidth = 2
+        form.add(namePreviewLabel, c); c.gridy += 1
+        // Spacer between name section and repositories section
+        val spacer = JPanel().apply { preferredSize = JBUI.size(1, JBUI.scale(12)) }
+        c.gridx = 0; c.gridwidth = 2
+        form.add(spacer, c); c.gridy += 1
+
+        // Repositories section title + scroll list (full width)
+        c.gridx = 0; c.gridwidth = 2
+        form.add(JBLabel("Repositories (from domain/repository):"), c); c.gridy += 1
+        reposPanel.layout = javax.swing.BoxLayout(reposPanel, javax.swing.BoxLayout.Y_AXIS)
+        c.gridx = 0; c.gridwidth = 2
+        form.add(reposScroll, c); c.gridy += 1
 
         // Dependency Injection title + options rows (full width), aligned with other dialogs
         c.gridx = 0; c.gridwidth = 2; c.weightx = 1.0
@@ -134,6 +166,16 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
         return panel
     }
 
+    private fun updateNamePreview() {
+        val raw = nameField.text.trim()
+        if (raw.isEmpty()) {
+            namePreviewLabel.text = ""
+        } else {
+            val finalName = if (raw.endsWith("UseCase", ignoreCase = true)) raw else raw + "UseCase"
+            namePreviewLabel.text = "Will generate class: $finalName"
+        }
+    }
+
     private fun updateDiControls() {
         val enabled = cbEnableDi.isSelected
         rbHilt.isEnabled = enabled
@@ -144,6 +186,67 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
         if (!showKoinAnn) cbKoinAnnotations.isSelected = false
         cbKoinAnnotations.revalidate()
         cbKoinAnnotations.repaint()
+    }
+
+    private fun refreshRepositories() {
+        repoCheckboxes.clear()
+        reposPanel.removeAll()
+        val dir = dirField.text.trim()
+        if (dir.isBlank()) {
+            reposPanel.add(JBLabel("Select a domain module to scan repositories"))
+            reposPanel.revalidate(); reposPanel.repaint()
+            return
+        }
+        val domainVf = LocalFileSystem.getInstance().refreshAndFindFileByPath(dir)
+        if (domainVf == null || !domainVf.isDirectory || !domainVf.name.equals("domain", ignoreCase = true)) {
+            reposPanel.add(JBLabel("Selected directory is not a domain module"))
+            reposPanel.revalidate(); reposPanel.repaint()
+            return
+        }
+        val kotlinRoot = VfsUtil.findRelativeFile("src/main/kotlin", domainVf)
+        if (kotlinRoot == null) {
+            reposPanel.add(JBLabel("No src/main/kotlin found"))
+            reposPanel.revalidate(); reposPanel.repaint()
+            return
+        }
+        val grouped = findRepositoriesGroupedByPackage(kotlinRoot)
+        if (grouped.isEmpty()) {
+            reposPanel.add(JBLabel("No repositories found"))
+        } else {
+            for ((pkg, repoList) in grouped.toSortedMap()) {
+                val header = JBLabel(pkg)
+                header.border = JBUI.Borders.empty(6, 0, 2, 0)
+                reposPanel.add(header)
+                repoList.sortedBy { it.first }.forEach { (simple, fqn) ->
+                    val cb = JBCheckBox(simple)
+                    repoCheckboxes.add(cb to fqn)
+                    reposPanel.add(cb)
+                }
+            }
+        }
+        reposPanel.revalidate(); reposPanel.repaint()
+    }
+
+    private fun findRepositoriesGroupedByPackage(root: VirtualFile): Map<String, List<Pair<String, String>>> {
+        val map = linkedMapOf<String, MutableList<Pair<String, String>>>()
+        val rootPath = root.path.trimEnd('/')
+        fun visit(dir: VirtualFile) {
+            if (!dir.isDirectory) return
+            if (dir.name.equals("repository", ignoreCase = true)) {
+                dir.children.filter { !it.isDirectory && it.name.endsWith(".kt") }.forEach { file ->
+                    val simple = file.name.removeSuffix(".kt")
+                    if (!simple.endsWith("Repository")) return@forEach
+                    val rel = file.path.substringAfter(rootPath + "/")
+                    val pkgPath = rel.substringBeforeLast('/')
+                    val pkg = pkgPath.replace('/', '.')
+                    val fqn = "$pkg.$simple"
+                    map.computeIfAbsent(pkg) { mutableListOf() }.add(simple to fqn)
+                }
+            }
+            dir.children.filter { it.isDirectory }.forEach { visit(it) }
+        }
+        visit(root)
+        return map
     }
 
     private fun updateOkAndError() {
@@ -166,15 +269,20 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
             }
         }
         if (nameField.text.isBlank()) {
-            errors += ValidationInfo("Please enter a use case name", nameField)
+            errors += ValidationInfo("Please enter a UseCase name", nameField)
         }
         return errors
     }
 
     fun getTargetDir(): String = dirField.text
-    fun getUseCaseName(): String = nameField.text.trim()
+    fun getUseCaseName(): String {
+        val raw = nameField.text.trim()
+        if (raw.isEmpty()) return raw
+        return if (raw.endsWith("UseCase", ignoreCase = true)) raw else raw + "UseCase"
+    }
     fun isDiEnabled(): Boolean = cbEnableDi.isSelected
     fun isHiltSelected(): Boolean = rbHilt.isSelected
     fun isKoinAnnotationsSelected(): Boolean = cbKoinAnnotations.isSelected
-}
 
+    fun getSelectedRepositories(): List<String> = repoCheckboxes.filter { it.first.isSelected }.map { it.second }
+}

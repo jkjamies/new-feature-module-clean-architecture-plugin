@@ -4,13 +4,13 @@ import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.*
 import com.intellij.util.ui.JBUI
-import javax.swing.JButton
-import javax.swing.JSeparator
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
@@ -24,8 +24,7 @@ import javax.swing.event.DocumentEvent
  * Dialog to gather inputs for generating a Presentation Screen.
  */
 class GenerateScreenDialog(private val project: Project) : DialogWrapper(project) {
-    private val dirField = JBTextField()
-    private val chooseButton = JButton("Choose...")
+    private val dirField = TextFieldWithBrowseButton(JBTextField())
     private val nameField = JBTextField()
 
     private val cbFlow = JBCheckBox("Use Flow StateHolder")
@@ -56,27 +55,29 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
         // Default the directory field to the current project so chooser opens there
         project.basePath?.let { dirField.text = it }
 
-        chooseButton.addActionListener {
+        // Configure directory chooser scoped to project base
+        run {
             val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
-            // Limit browsing to the current project root, to match the modules generator
             val basePath = project.basePath
             if (basePath != null) {
-                val baseVf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
+                val baseVf = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
                 if (baseVf != null) descriptor.withRoots(baseVf)
             }
-            val currentText = dirField.text
-            val toSelectPath = if (currentText.isNullOrBlank()) basePath else currentText
-            val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
-            val file = FileChooser.chooseFile(descriptor, project, toSelect)
-            if (file != null) {
-                dirField.text = file.path
-                userInteracted = true
-                updateOkAndError()
+            dirField.addActionListener {
+                val currentText = dirField.text
+                val toSelectPath = if (currentText.isNullOrBlank()) project.basePath else currentText
+                val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
+                val file = FileChooser.chooseFile(descriptor, project, toSelect)
+                if (file != null) {
+                    dirField.text = file.path
+                    userInteracted = true
+                    updateOkAndError()
+                }
             }
         }
 
         // Live validation on directory field changes
-        dirField.document.addDocumentListener(object : DocumentAdapter() {
+        dirField.textField.document.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
                 userInteracted = true
                 updateOkAndError()
@@ -128,11 +129,7 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
             c.gridy += 1
         }
 
-        val dirPanel = JPanel(BorderLayout()).apply {
-            add(dirField, BorderLayout.CENTER)
-            add(chooseButton, BorderLayout.EAST)
-        }
-        row("Directory (desired presentation module):", dirPanel)
+        row("Directory (desired presentation module):", dirField)
         row("Screen name (e.g., HomeScreen):", nameField)
 
         // Options

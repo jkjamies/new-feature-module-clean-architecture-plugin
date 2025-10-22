@@ -6,7 +6,7 @@ import junit.framework.TestCase
 class GenerateUseCaseActionTests : TestCase() {
     fun testActionHasCorrectPresentationText() {
         val action: AnAction = GenerateUseCaseAction()
-        assertEquals("Generate Use Case", action.templatePresentation.text)
+        assertEquals("Generate UseCase", action.templatePresentation.text)
     }
 }
 
