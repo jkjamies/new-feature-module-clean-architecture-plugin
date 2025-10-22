@@ -26,6 +26,11 @@
                     class="com.github.jkjamies.cammp.feature.repositorygenerator.actions.GenerateRepositoryAction"
                     text="Generate Repository"
                     description="Create repository interface in domain and implementation in data module"/>
+
+            <action id="com.github.jkjamies.cammp.actions.GenerateUseCaseAction"
+                    class="com.github.jkjamies.cammp.feature.usecasegenerator.actions.GenerateUseCaseAction"
+                    text="Generate Use Case"
+                    description="Create a use case in the domain module"/>
         </group>
     </actions>
 </idea-plugin>
