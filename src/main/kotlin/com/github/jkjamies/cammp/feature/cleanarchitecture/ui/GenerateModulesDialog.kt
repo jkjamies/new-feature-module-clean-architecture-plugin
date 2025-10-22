@@ -119,7 +119,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             // Replace deprecated addBrowseFolderListener with an action listener that opens FileChooser
             rootField.addActionListener {
                 val currentText = rootField.text
-                val toSelectPath = if (currentText.isNullOrBlank()) projectBasePath else currentText
+                val toSelectPath = currentText.ifBlank { projectBasePath }
                 val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
                 val file = FileChooser.chooseFile(descriptor, project, toSelect)
                 if (file != null) {
@@ -212,7 +212,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             val isAbsolute = inPath.isAbsolute
             val underBase = inPath.startsWith(normBase)
             if (isAbsolute && !underBase) {
-                ValidationInfo("Path must be under the project root: ${normBase}", rootField)
+                ValidationInfo("Path must be under the project root: $normBase", rootField)
             } else null
         } catch (t: Throwable) {
             // If it's not a valid path string, let it pass as plain relative text
@@ -353,7 +353,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         val displayRoot = try {
             if (rawRoot.isBlank()) "root" else Paths.get(rawRoot).fileName?.toString() ?: rawRoot
         } catch (t: Throwable) {
-            if (rawRoot.isBlank()) "root" else rawRoot
+            rawRoot.ifBlank { "root" }
         }
         val feature = featureField.text.trim().ifEmpty { "feature" }
         val base = projectBasePath

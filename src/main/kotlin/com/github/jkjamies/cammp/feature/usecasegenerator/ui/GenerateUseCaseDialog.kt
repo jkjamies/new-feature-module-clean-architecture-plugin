@@ -60,7 +60,7 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
             }
             dirField.addActionListener {
                 val currentText = dirField.text
-                val toSelectPath = if (currentText.isNullOrBlank()) project.basePath else currentText
+                val toSelectPath = currentText.ifBlank { project.basePath }
                 val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
                 val file = FileChooser.chooseFile(descriptor, project, toSelect)
                 if (file != null) {
@@ -236,7 +236,7 @@ class GenerateUseCaseDialog(private val project: Project) : DialogWrapper(projec
                 dir.children.filter { !it.isDirectory && it.name.endsWith(".kt") }.forEach { file ->
                     val simple = file.name.removeSuffix(".kt")
                     if (!simple.endsWith("Repository")) return@forEach
-                    val rel = file.path.substringAfter(rootPath + "/")
+                    val rel = file.path.substringAfter("$rootPath/")
                     val pkgPath = rel.substringBeforeLast('/')
                     val pkg = pkgPath.replace('/', '.')
                     val fqn = "$pkg.$simple"

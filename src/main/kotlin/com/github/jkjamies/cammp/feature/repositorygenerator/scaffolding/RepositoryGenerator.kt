@@ -33,7 +33,7 @@ class RepositoryGenerator(@Suppress("unused") private val project: Project) {
         var text = loadTemplate(name)
         for ((k, v) in vars) {
 //            text = text.replace("\${'$'}{$k}", v)
-            text = text.replace("\${$k}", v)
+            text = text.replace($$"${$$k}", v)
 
         }
         return text

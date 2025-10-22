@@ -65,7 +65,7 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
             }
             dirField.addActionListener {
                 val currentText = dirField.text
-                val toSelectPath = if (currentText.isNullOrBlank()) project.basePath else currentText
+                val toSelectPath = currentText.ifBlank { project.basePath }
                 val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
                 val file = FileChooser.chooseFile(descriptor, project, toSelect)
                 if (file != null) {
@@ -182,7 +182,7 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
     // Live validation helper: disable OK when invalid; show error only after interaction
     private fun updateOkAndError() {
         val vi = doValidate()
-        setOKActionEnabled(vi == null)
+        isOKActionEnabled = vi == null
         // Only show error text after the user interacts (types or chooses)
         if (userInteracted) {
             setErrorText(vi?.message, vi?.component)
@@ -197,7 +197,7 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
         // Require selecting a presentation module directory
         run {
             val last = try {
-                java.nio.file.Paths.get(dir).fileName?.toString()
+                Paths.get(dir).fileName?.toString()
             } catch (t: Throwable) {
                 null
             }
