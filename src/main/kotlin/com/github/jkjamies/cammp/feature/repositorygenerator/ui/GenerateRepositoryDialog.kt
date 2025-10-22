@@ -98,9 +98,9 @@ class GenerateRepositoryDialog(private val project: Project) : DialogWrapper(pro
         }
 
         fun row(label: String, comp: JComponent) {
-            c.gridx = 0; c.weightx = 0.0
+            c.gridx = 0; c.weightx = 0.0; c.gridwidth = 1
             form.add(JBLabel(label), c)
-            c.gridx = 1; c.weightx = 1.0
+            c.gridx = 1; c.weightx = 1.0; c.gridwidth = 1
             form.add(comp, c)
             c.gridy += 1
         }
@@ -113,23 +113,25 @@ class GenerateRepositoryDialog(private val project: Project) : DialogWrapper(pro
         row("Data module directory:", dirPanel)
         row("Repository name:", nameField)
 
-        // DI section
-        val diPanel = JPanel(GridBagLayout())
-        val dc = GridBagConstraints().apply {
-            fill = GridBagConstraints.NONE
-            anchor = GridBagConstraints.WEST
-            insets = JBUI.insets(0, 0, 0, 8)
-        }
-        dc.gridx = 0; dc.gridy = 0
-        diPanel.add(cbEnableDi, dc)
-        dc.gridy = 1; dc.gridx = 0
-        diPanel.add(rbHilt, dc)
-        dc.gridx = 1
-        diPanel.add(rbKoin, dc)
-        dc.gridx = 0; dc.gridy = 2; dc.gridwidth = 2
-        diPanel.add(cbKoinAnnotations, dc)
+        // Dependency Injection title + options below (full width), aligned like presentation dialog
+        c.gridx = 0; c.gridwidth = 2; c.weightx = 1.0
+        form.add(JBLabel("Dependency Injection:"), c); c.gridy += 1
 
-        row("Dependency Injection:", diPanel)
+        val diEnablePanel = JPanel().apply {
+            layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
+            add(cbEnableDi)
+        }
+        c.gridx = 0; c.gridwidth = 2
+        form.add(diEnablePanel, c); c.gridy += 1
+
+        val diRow = JPanel().apply {
+            layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
+            add(rbHilt)
+            add(rbKoin)
+            add(cbKoinAnnotations)
+        }
+        c.gridx = 0; c.gridwidth = 2
+        form.add(diRow, c); c.gridy += 1
 
         panel.add(form, BorderLayout.NORTH)
         return panel
@@ -144,6 +146,9 @@ class GenerateRepositoryDialog(private val project: Project) : DialogWrapper(pro
         cbKoinAnnotations.isVisible = showKoinAnn
         cbKoinAnnotations.isEnabled = showKoinAnn
         if (!showKoinAnn) cbKoinAnnotations.isSelected = false
+        // ensure layout updates smoothly
+        cbKoinAnnotations.revalidate()
+        cbKoinAnnotations.repaint()
     }
 
     private fun updateOkAndError() {

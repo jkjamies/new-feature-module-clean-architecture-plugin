@@ -1,9 +1,9 @@
 package com.github.jkjamies.cammp.feature.cleanarchitecture.ui
 
+import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.openapi.ui.TextComponentAccessor
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.JBCheckBox
@@ -21,10 +21,10 @@ import javax.swing.JPanel
 import javax.swing.event.DocumentEvent
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
 import java.awt.Dimension
 import java.awt.event.ItemListener
 import java.nio.file.Paths
-import javax.swing.JTextField
 import javax.swing.SwingConstants
 
 /**
@@ -50,6 +50,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         add(platformKmpRadioButton)
     }
     private val platformOptionsPanel = JPanel().apply {
+        layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
         add(platformAndroidRadioButton)
         add(platformKmpRadioButton)
         isVisible = true
@@ -65,6 +66,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     private val localDatasourceCheckBox = JBCheckBox("Local datasource", false)
     private val datasourceOptionsPanel = JPanel().apply {
         // simple horizontal panel to hold datasource options (Remote, Local, then Combined)
+        layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
         add(remoteDatasourceCheckBox)
         add(localDatasourceCheckBox)
         add(combinedDatasourceCheckBox)
@@ -73,7 +75,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     }
 
     // Dependency Injection section controls
-    private val includeDiCheckBox = JBCheckBox("Include dependency injection module", true)
+    private val includeDiCheckBox = JBCheckBox("Enable Dependency Injection", true)
     private val diHiltRadioButton = JBRadioButton("Hilt", true)
     private val diKoinRadioButton = JBRadioButton("Koin", false)
     private val diButtonGroup = ButtonGroup().apply {
@@ -82,6 +84,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     }
     private val koinAnnotationsCheckBox = JBCheckBox("Koin Annotations", false)
     private val diOptionsPanel = JPanel().apply {
+        layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
         add(diHiltRadioButton)
         add(diKoinRadioButton)
         add(koinAnnotationsCheckBox)
@@ -113,22 +116,16 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
                 val baseVf = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
                 if (baseVf != null) descriptor.withRoots(baseVf)
             }
-            rootField.addBrowseFolderListener(
-                "Select root folder under project",
-                null,
-                project,
-                descriptor,
-                object : TextComponentAccessor<JTextField> {
-                    override fun getText(component: JTextField): String {
-                        val t = component.text
-                        val base = projectBasePath
-                        return if (t.isNullOrBlank() && base != null) base else t
-                    }
-                    override fun setText(component: JTextField, text: String) {
-                        component.text = text
-                    }
+            // Replace deprecated addBrowseFolderListener with an action listener that opens FileChooser
+            rootField.addActionListener {
+                val currentText = rootField.text
+                val toSelectPath = if (currentText.isNullOrBlank()) projectBasePath else currentText
+                val toSelect = if (toSelectPath != null) VfsUtil.findFile(Paths.get(toSelectPath).normalize(), true) else null
+                val file = FileChooser.chooseFile(descriptor, project, toSelect)
+                if (file != null) {
+                    rootField.text = file.path
                 }
-            )
+            }
         }
 
         // Prepopulate root field with project base path so the user sees the full absolute path
@@ -281,40 +278,45 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         }
         form.add(orgPanel, gc)
 
-        // Platform section label
-        gc.gridx = 0; gc.gridy = 3
+        // Platform section - title full width, options full width left-aligned
+        gc.gridx = 0; gc.gridy = 3; gc.gridwidth = 2
         form.add(JBLabel("Platform:"), gc)
-        // Platform options panel (Android / KMP)
-        gc.gridx = 1; gc.gridy = 3
+        gc.gridx = 0; gc.gridy = 4; gc.gridwidth = 2
         form.add(platformOptionsPanel, gc)
 
-        // Data section label
-        gc.gridx = 0; gc.gridy = 4
+        // Data section - title on its own row (full width), then enable row (full width), then options row (full width)
+        gc.gridx = 0; gc.gridy = 5; gc.gridwidth = 2
         form.add(JBLabel("Data:"), gc)
-        // Include datasource checkbox
-        gc.gridx = 1; gc.gridy = 4
-        form.add(includeDatasourceCheckBox, gc)
-
-        // Datasource options panel (always visible; disabled when Include datasource is off)
-        gc.gridx = 1; gc.gridy = 5
+        val dataEnablePanel = JPanel().apply {
+            layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
+            add(includeDatasourceCheckBox)
+        }
+        gc.gridx = 0; gc.gridy = 6; gc.gridwidth = 2
+        form.add(dataEnablePanel, gc)
+        gc.gridx = 0; gc.gridy = 7; gc.gridwidth = 2
         form.add(datasourceOptionsPanel, gc)
 
-        // Dependency Injection section label
-        gc.gridx = 0; gc.gridy = 6
+        // Dependency Injection title + options below (full width), aligned like presentation dialog
+        gc.gridx = 0; gc.gridy = 8; gc.gridwidth = 2
         form.add(JBLabel("Dependency Injection:"), gc)
-        // Include DI checkbox
-        gc.gridx = 1; gc.gridy = 6
-        form.add(includeDiCheckBox, gc)
-        // DI options panel (always visible; disabled when include DI is off)
-        gc.gridx = 1; gc.gridy = 7
+        val diEnablePanel = JPanel().apply {
+            layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
+            add(includeDiCheckBox)
+        }
+        gc.gridx = 0; gc.gridy = 9; gc.gridwidth = 2
+        form.add(diEnablePanel, gc)
+        gc.gridx = 0; gc.gridy = 10; gc.gridwidth = 2
         form.add(diOptionsPanel, gc)
 
-        // Presentation section label
-        gc.gridx = 0; gc.gridy = 8
+        // Presentation section - title on its own row (full width), then enable row (full width)
+        gc.gridx = 0; gc.gridy = 11; gc.gridwidth = 2
         form.add(JBLabel("Presentation:"), gc)
-        // Include presentation checkbox
-        gc.gridx = 1; gc.gridy = 8
-        form.add(includePresentationCheckBox, gc)
+        val presentationEnablePanel = JPanel().apply {
+            layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
+            add(includePresentationCheckBox)
+        }
+        gc.gridx = 0; gc.gridy = 12; gc.gridwidth = 2
+        form.add(presentationEnablePanel, gc)
 
         panel.add(form, BorderLayout.NORTH)
         return panel
@@ -437,6 +439,8 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
             koinAnnotationsCheckBox.isSelected = false
             koinAnnotationsCheckBox.isEnabled = false
             koinAnnotationsCheckBox.isVisible = false
+            koinAnnotationsCheckBox.revalidate()
+            koinAnnotationsCheckBox.repaint()
             return
         }
 
@@ -474,6 +478,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         if (!koinSelected) {
             koinAnnotationsCheckBox.isSelected = false
         }
+        koinAnnotationsCheckBox.revalidate()
+        koinAnnotationsCheckBox.repaint()
     }
 }
-
