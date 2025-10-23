@@ -48,7 +48,9 @@ class PresentationScreenGeneratorOrgDetectionTests : LightPlatformTestCase() {
                 useScreenStateHolder = true,
                 diChoice = GenerateScreenDialog.DiChoice.HILT,
                 koinAnnotations = false,
-                patternChoice = GenerateScreenDialog.PatternChoice.MVI
+                patternChoice = GenerateScreenDialog.PatternChoice.MVI,
+                selectedUseCaseFqns = emptyList(),
+                selectedUseCaseModulePaths = emptySet()
             )
         }
         assertTrue(result.contains("Presentation screen 'Checkout'"))

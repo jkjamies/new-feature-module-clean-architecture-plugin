@@ -37,7 +37,9 @@ class PresentationScreenGeneratorPatternTests : LightPlatformTestCase() {
                 useScreenStateHolder = true,
                 diChoice = GenerateScreenDialog.DiChoice.HILT,
                 koinAnnotations = false,
-                patternChoice = GenerateScreenDialog.PatternChoice.MVVM
+                patternChoice = GenerateScreenDialog.PatternChoice.MVVM,
+                selectedUseCaseFqns = emptyList(),
+                selectedUseCaseModulePaths = emptySet()
             )
         }
 

@@ -56,7 +56,7 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
 
         // Navigation artifacts
         val navDir = VfsUtil.findRelativeFile("navigation", basePkgDir) ?: error("navigation dir not created")
-        assertNotNull(navDir.findChild("PaymentsNavHost.kt").also { /* uses parent module name before presentation */ })
+        assertNotNull(navDir.findChild("PaymentsNavHost.kt"))
         val destDir = VfsUtil.findRelativeFile("destinations", navDir) ?: error("destinations dir not created")
         assertNotNull(destDir.findChild("CheckoutDestination.kt"))
 
@@ -103,7 +103,7 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
         assertNotNull(screenDir.findChild("HomeIntent.kt"))
         assertNotNull(screenDir.findChild("HomeViewModel.kt"))
         assertNotNull(screenDir.findChild("HomeUiState.kt"))
-        assertNotNull(screenDir.findChild("HomeScreenStateHolder.kt").let { it ?: screenDir.findChild("HomeStateHolder.kt") })
+        assertNotNull(screenDir.findChild("HomeScreenStateHolder.kt") ?: screenDir.findChild("HomeStateHolder.kt"))
     }
 
     fun testGeneratesScreenWithReplacedPlaceholders_MVVM() {
