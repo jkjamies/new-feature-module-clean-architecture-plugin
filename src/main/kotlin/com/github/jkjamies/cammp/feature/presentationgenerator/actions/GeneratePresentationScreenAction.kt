@@ -27,6 +27,8 @@ class GeneratePresentationScreenAction : AnAction("Generate Presentation Screen"
         val diChoice = dialog.getDiChoice()
         val koinAnnotations = dialog.isKoinAnnotationsSelected()
         val patternChoice = dialog.getPatternChoice()
+        val selectedUseCaseModulePaths = dialog.getSelectedUseCaseGradlePaths()
+        val selectedUseCaseFqns = dialog.getSelectedUseCaseFqns()
 
         val basePath = project.basePath ?: run {
             Messages.showErrorDialog(project, "Project base path not found", "Error")
@@ -54,7 +56,9 @@ class GeneratePresentationScreenAction : AnAction("Generate Presentation Screen"
                     useScreenStateHolder = useScreenStateHolder,
                     diChoice = diChoice,
                     koinAnnotations = koinAnnotations,
-                    patternChoice = patternChoice
+                    patternChoice = patternChoice,
+                    selectedUseCaseFqns = selectedUseCaseFqns,
+                    selectedUseCaseModulePaths = selectedUseCaseModulePaths
                 )
                 Messages.showInfoMessage(project, result, "Success")
             } catch (t: Throwable) {

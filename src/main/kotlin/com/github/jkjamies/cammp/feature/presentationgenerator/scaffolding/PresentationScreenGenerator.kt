@@ -74,7 +74,9 @@ class PresentationScreenGenerator(private val project: Project) {
         useScreenStateHolder: Boolean,
         diChoice: DiChoice,
         koinAnnotations: Boolean,
-        patternChoice: PatternChoice
+        patternChoice: PatternChoice,
+        selectedUseCaseFqns: List<String> = emptyList(),
+        selectedUseCaseModulePaths: Set<String> = emptySet()
     ): String {
         val lfs = LocalFileSystem.getInstance()
         val baseDir = lfs.refreshAndFindFileByPath(projectBasePath)
@@ -129,8 +131,6 @@ class PresentationScreenGenerator(private val project: Project) {
                 VfsUtil.saveText(screenKt, content)
             }
 
-            // Determine base name without trailing "Screen" for ancillary files
-
             // Additional screen-layer files: Intent (MVI only), ViewModel, UiState (omit trailing "Screen" in names)
             if (patternChoice == PatternChoice.MVI) {
                 val intentName = "${baseName}Intent.kt"
@@ -142,12 +142,29 @@ class PresentationScreenGenerator(private val project: Project) {
                 )))
             }
 
+            // Compute imports and constructor params for ViewModel based on selected UseCases
+            data class UseCaseRef(val simple: String, val fqn: String)
+            val ucRefs = selectedUseCaseFqns.filter { it.isNotBlank() }.distinct().map { fqn ->
+                val simple = fqn.substringAfterLast('.')
+                UseCaseRef(simple = simple, fqn = fqn)
+            }
+            val imports = ucRefs
+                .filter { it.fqn.contains('.') }
+                .sortedBy { it.fqn }
+                .joinToString("\n") { "import ${it.fqn}" }
+            val constructorParams = ucRefs.joinToString(",\n    ") { ref ->
+                val param = ref.simple.replaceFirstChar { it.lowercase(Locale.getDefault()) }
+                "private val $param: ${ref.simple}"
+            }
+
             val viewModelName = "${baseName}ViewModel.kt"
             val viewModelFile = screenDir.findChild(viewModelName) ?: screenDir.createChildData(this, viewModelName)
             if (viewModelFile.length == 0L) VfsUtil.saveText(viewModelFile, renderTemplate("ViewModel.kt", mapOf(
                 "PACKAGE" to basePkg,
                 "FOLDER" to folderName,
-                "BASE_NAME" to baseName
+                "BASE_NAME" to baseName,
+                "IMPORTS" to imports,
+                "CONSTRUCTOR_PARAMS" to constructorParams
             )))
 
             val uiStateName = "${baseName}UiState.kt"
@@ -203,9 +220,103 @@ class PresentationScreenGenerator(private val project: Project) {
             )))
         }
 
-        // DI options are currently UI-only; keep feature separate from clean architecture generator
+        // Cross-feature usecase dependencies: add missing implementation(project(":"...)) entries
+        if (selectedUseCaseModulePaths.isNotEmpty()) {
+            addDependenciesForUseCases(targetDir, rootDirName, parentModuleName, selectedUseCaseModulePaths)
+        }
+
         targetDir.refresh(true, true)
         return "Presentation screen '$screenName' generated under $targetDirRelativeToProject."
     }
 
+    // Backwards-compatible overload to preserve the original signature used by tests
+    fun generate(
+        projectBasePath: String,
+        targetDirRelativeToProject: String,
+        screenName: String,
+        addNavigation: Boolean,
+        useFlowStateHolder: Boolean,
+        useScreenStateHolder: Boolean,
+        diChoice: DiChoice,
+        koinAnnotations: Boolean,
+        patternChoice: PatternChoice
+    ): String = generate(
+        projectBasePath = projectBasePath,
+        targetDirRelativeToProject = targetDirRelativeToProject,
+        screenName = screenName,
+        addNavigation = addNavigation,
+        useFlowStateHolder = useFlowStateHolder,
+        useScreenStateHolder = useScreenStateHolder,
+        diChoice = diChoice,
+        koinAnnotations = koinAnnotations,
+        patternChoice = patternChoice,
+        selectedUseCaseFqns = emptyList(),
+        selectedUseCaseModulePaths = emptySet()
+    )
+
+    private fun addDependenciesForUseCases(
+        moduleDir: VirtualFile,
+        rootDirName: String,
+        currentFeatureName: String,
+        selectedUseCaseModulePaths: Set<String>
+    ) {
+        // Consider any selected module that is not under the same feature submodules
+        val sameFeaturePrefix = ":$rootDirName:$currentFeatureName"
+        val crossModuleDeps = selectedUseCaseModulePaths.filter { gradlePath ->
+            // exclude if it's the same feature module path or a submodule of it
+            !(gradlePath == sameFeaturePrefix || gradlePath.startsWith("$sameFeaturePrefix:"))
+        }.toSet()
+        if (crossModuleDeps.isEmpty()) return
+
+        val buildFile = moduleDir.findChild("build.gradle.kts")
+            ?: moduleDir.findChild("build.gradle")
+            ?: return
+        val original = VfsUtil.loadText(buildFile)
+
+        // Skip those already present
+        val missing = crossModuleDeps.filterNot { dep -> original.contains("project(\"$dep\")") }
+        if (missing.isEmpty()) return
+
+        val updated = insertDependencies(original, missing)
+        if (updated != original) {
+            VfsUtil.saveText(buildFile, updated)
+        }
+    }
+
+    private fun insertDependencies(original: String, modulePaths: Collection<String>): String {
+        val depDecls = modulePaths.joinToString("\n") { "    implementation(project(\"$it\"))" }
+        val regex = Regex("dependencies\\s*\\{")
+        val match = regex.find(original)
+        return if (match != null) {
+            val start = match.range.last + 1 // position after '{'
+            val end = findMatchingBrace(original, match.range.last)
+            if (end > start) {
+                val before = original.substring(0, end)
+                val after = original.substring(end)
+                // Insert before the closing brace with a preceding newline
+                before + "\n" + depDecls + "\n" + after
+            } else {
+                // Fallback: append a new dependencies block
+                original.trimEnd() + "\n\n" + "dependencies {\n$depDecls\n}\n"
+            }
+        } else {
+            // No dependencies block; append one at end
+            original.trimEnd() + "\n\n" + "dependencies {\n$depDecls\n}\n"
+        }
+    }
+
+    private fun findMatchingBrace(text: String, openBraceIndex: Int): Int {
+        // openBraceIndex should be at the position of '{'
+        var depth = 0
+        for (i in openBraceIndex until text.length) {
+            when (text[i]) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return i
+                }
+            }
+        }
+        return -1
+    }
 }
