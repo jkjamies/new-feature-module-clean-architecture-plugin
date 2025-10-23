@@ -105,4 +105,116 @@ class PresentationScreenGeneratorTests : LightPlatformTestCase() {
         assertNotNull(screenDir.findChild("HomeUiState.kt"))
         assertNotNull(screenDir.findChild("HomeScreenStateHolder.kt").let { it ?: screenDir.findChild("HomeStateHolder.kt") })
     }
+
+    fun testGeneratesScreenWithReplacedPlaceholders_MVVM() {
+        val tempProject = Files.createTempDirectory("presentation-gen-test").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+            ?: error("project root VFS not found")
+
+        // Create presentation module directory structure under write action
+        val presDir = WriteAction.compute<VirtualFile, RuntimeException> {
+            VfsUtil.createDirectoryIfMissing(projectRootVf, "features/profile/presentation")
+                ?: error("Failed to create presentation module dir")
+        }
+
+        val generator = PresentationScreenGenerator(project)
+        val resultMsg = WriteAction.compute<String, RuntimeException> {
+            generator.generate(
+                projectBasePath = projectRootVf.path,
+                targetDirRelativeToProject = "features/profile/presentation",
+                screenName = "HomeScreen",
+                addNavigation = false,
+                useFlowStateHolder = false,
+                useScreenStateHolder = false,
+                diChoice = GenerateScreenDialog.DiChoice.HILT,
+                koinAnnotations = false,
+                patternChoice = GenerateScreenDialog.PatternChoice.MVVM
+            )
+        }
+        assertTrue(resultMsg.contains("Presentation screen 'HomeScreen'"))
+
+        // Verify main Screen.kt created with placeholders replaced
+        val screenFile = VfsUtil.findRelativeFile(
+            "src/main/kotlin/com/jkjamies/features/profile/presentation/home/HomeScreen.kt",
+            presDir
+        ) ?: error("HomeScreen.kt not created")
+        val content = VfsUtil.loadText(screenFile)
+        assertTrue(content.contains("package com.jkjamies.features.profile.presentation.home"))
+        assertTrue(content.contains("fun HomeScreen()"))
+        assertFalse("Placeholders were not replaced", content.contains("\${"))
+    }
+
+    fun testGeneratesNavigationAndDestinationWithReplacedPlaceholders() {
+        val tempProject = Files.createTempDirectory("presentation-gen-test-nav").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+            ?: error("project root VFS not found")
+
+        val presDir = WriteAction.compute<VirtualFile, RuntimeException> {
+            VfsUtil.createDirectoryIfMissing(projectRootVf, "features/orders/presentation")
+                ?: error("Failed to create presentation module dir")
+        }
+
+        val generator = PresentationScreenGenerator(project)
+        WriteAction.compute<String, RuntimeException> {
+            generator.generate(
+                projectBasePath = projectRootVf.path,
+                targetDirRelativeToProject = "features/orders/presentation",
+                screenName = "DetailsScreen",
+                addNavigation = true,
+                useFlowStateHolder = true,
+                useScreenStateHolder = true,
+                diChoice = GenerateScreenDialog.DiChoice.HILT,
+                koinAnnotations = false,
+                patternChoice = GenerateScreenDialog.PatternChoice.MVI
+            )
+        }
+
+        // NavHost
+        val navHost = VfsUtil.findRelativeFile(
+            "src/main/kotlin/com/jkjamies/features/orders/presentation/navigation/OrdersNavHost.kt",
+            presDir
+        ) ?: error("NavHost not created")
+        val navHostText = VfsUtil.loadText(navHost)
+        assertTrue(navHostText.contains("package com.jkjamies.features.orders.presentation.navigation"))
+        assertTrue(navHostText.contains("fun OrdersNavHost()"))
+        assertFalse(navHostText.contains("\${"))
+
+        // Destination
+        val destination = VfsUtil.findRelativeFile(
+            "src/main/kotlin/com/jkjamies/features/orders/presentation/navigation/destinations/DetailsScreenDestination.kt",
+            presDir
+        ) ?: error("Destination not created")
+        val destText = VfsUtil.loadText(destination)
+        assertTrue(destText.contains("package com.jkjamies.features.orders.presentation.navigation.destinations"))
+        assertTrue(destText.contains("object DetailsScreenDestination"))
+        assertTrue(destText.contains("const val route = \"detailsscreen\""))
+        assertFalse(destText.contains("\${"))
+
+        // Intent for MVI pattern
+        val intent = VfsUtil.findRelativeFile(
+            "src/main/kotlin/com/jkjamies/features/orders/presentation/details/DetailsIntent.kt",
+            presDir
+        ) ?: error("Intent not created for MVI")
+        val intentText = VfsUtil.loadText(intent)
+        assertTrue(intentText.contains("sealed interface DetailsIntent"))
+        assertFalse(intentText.contains("\${"))
+
+        // ScreenStateHolder should be created under screen folder and be replaced
+        val ssh = VfsUtil.findRelativeFile(
+            "src/main/kotlin/com/jkjamies/features/orders/presentation/details/DetailsScreenStateHolder.kt",
+            presDir
+        ) ?: error("ScreenStateHolder not created")
+        val sshText = VfsUtil.loadText(ssh)
+        assertTrue(sshText.contains("class DetailsScreenStateHolder"))
+        assertFalse(sshText.contains("\${"))
+
+        // FlowStateHolder created at base package level
+        val fsh = VfsUtil.findRelativeFile(
+            "src/main/kotlin/com/jkjamies/features/orders/presentation/OrdersFlowStateHolder.kt",
+            presDir
+        ) ?: error("FlowStateHolder not created")
+        val fshText = VfsUtil.loadText(fsh)
+        assertTrue(fshText.contains("class OrdersFlowStateHolder"))
+        assertFalse(fshText.contains("\${"))
+    }
 }

@@ -27,7 +27,8 @@ class UseCaseGenerator(@Suppress("unused") private val project: Project) {
     private fun renderTemplate(name: String, vars: Map<String, String>): String {
         var text = loadTemplate(name)
         for ((k, v) in vars) {
-            text = text.replace($$"${$$k}", v)
+            val placeholder = "\${$k}"
+            text = text.replace(placeholder, v)
         }
         return text
     }

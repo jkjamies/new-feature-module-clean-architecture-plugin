@@ -38,8 +38,10 @@ class PresentationScreenGenerator(private val project: Project) {
 
     private fun renderTemplate(name: String, vars: Map<String, String>): String {
         var text = loadTemplate(name)
+        // Replace placeholders of the form ${KEY} with provided values
         for ((k, v) in vars) {
-            text = text.replace($$"${'$'}{$$k}", v)
+            val placeholder = "\${$k}"
+            text = text.replace(placeholder, v)
         }
         return text
     }

@@ -5,7 +5,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 
 @Composable
-fun ${NAV_HOST_NAME}() {
+internal fun ${NAV_HOST_NAME}() {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = "TODO") {
         // TODO: add destinations

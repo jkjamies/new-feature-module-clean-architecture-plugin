@@ -46,12 +46,16 @@ class RepositoryGeneratorTests : LightPlatformTestCase() {
             vfsRoot
         )
         assertNotNull(domainRepoFile)
+        val domainText = VfsUtilCore.loadText(domainRepoFile!!)
+        assertFalse("Unreplaced placeholders in domain repository", domainText.contains("${'$'}{"))
 
         val dataRepoFile = VfsUtil.findRelativeFile(
             "features/catalog/data/src/main/kotlin/com/jkjamies/features/catalog/data/repository/ProductRepositoryImpl.kt",
             vfsRoot
         )
         assertNotNull(dataRepoFile)
+        val dataText = VfsUtilCore.loadText(dataRepoFile!!)
+        assertFalse("Unreplaced placeholders in data repository", dataText.contains("${'$'}{"))
 
         val diModuleFile = VfsUtil.findRelativeFile(
             "features/catalog/di/src/main/kotlin/com/jkjamies/features/catalog/di/repository/RepositoryModule.kt",
@@ -64,6 +68,7 @@ class RepositoryGeneratorTests : LightPlatformTestCase() {
         assertTrue(text.contains("abstract class RepositoryModule"))
         assertTrue(text.contains("@Binds"))
         assertTrue(text.contains("abstract fun bindProductRepository(impl: ProductRepositoryImpl): ProductRepository"))
+        assertFalse("Unreplaced placeholders in DI module", text.contains("${'$'}{"))
     }
 
     fun testNoDiArtifactsWhenDisabled() {

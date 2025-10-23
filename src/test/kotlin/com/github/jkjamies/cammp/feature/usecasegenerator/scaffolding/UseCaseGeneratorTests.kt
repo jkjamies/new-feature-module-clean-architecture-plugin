@@ -47,6 +47,7 @@ class UseCaseGeneratorTests : LightPlatformTestCase() {
         assertTrue(text.contains("class PlaceOrderUseCase"))
         assertTrue(text.contains("@Inject constructor"))
         assertTrue(text.contains("suspend operator fun invoke()"))
+        assertFalse("Unreplaced placeholders in use case", text.contains("${'$'}{"))
     }
 
     fun testGenerateWritesTodoWhenNotHilt() {
@@ -123,13 +124,14 @@ class UseCaseGeneratorTests : LightPlatformTestCase() {
             vfsRoot
         )
         assertNotNull(useCaseFile)
-        val text = VfsUtilCore.loadText(useCaseFile!!)
+        val text2 = VfsUtilCore.loadText(useCaseFile!!)
         // Import present
-        assertTrue(text.contains("import com.jkjamies.features.orders.domain.repository.OrderRepository"))
+        assertTrue(text2.contains("import com.jkjamies.features.orders.domain.repository.OrderRepository"))
         // Constructor parameter present (lower camel name)
-        assertTrue(text.contains("private val orderRepository: OrderRepository"))
+        assertTrue(text2.contains("private val orderRepository: OrderRepository"))
         // Class header still valid
-        assertTrue(text.contains("class FetchOrdersUseCase @Inject constructor("))
+        assertTrue(text2.contains("class FetchOrdersUseCase @Inject constructor("))
+        assertFalse("Unreplaced placeholders in use case", text2.contains("${'$'}{"))
     }
 
     fun testGenerateHandlesFqnRepositorySelection() {
@@ -170,9 +172,9 @@ class UseCaseGeneratorTests : LightPlatformTestCase() {
             vfsRoot
         )
         assertNotNull(useCaseFile)
-        val text = VfsUtilCore.loadText(useCaseFile!!)
-        assertTrue(text.contains("import com.jkjamies.features.catalog.domain.repository.CatalogRepository"))
-        assertTrue(text.contains("private val catalogRepository: CatalogRepository"))
+        val text3 = VfsUtilCore.loadText(useCaseFile!!)
+        assertTrue(text3.contains("import com.jkjamies.features.catalog.domain.repository.CatalogRepository"))
+        assertTrue(text3.contains("private val catalogRepository: CatalogRepository"))
     }
 
     fun testGenerateAddsMultipleRepositoriesWithFqnAndSimple() {
@@ -214,11 +216,12 @@ class UseCaseGeneratorTests : LightPlatformTestCase() {
             vfsRoot
         )
         assertNotNull(useCaseFile)
-        val text = VfsUtilCore.loadText(useCaseFile!!)
-        assertTrue(text.contains("import com.jkjamies.features.billing.domain.repository.InvoiceRepository"))
-        assertTrue(text.contains("import com.jkjamies.features.billing.domain.repository.StatementRepository"))
-        assertTrue(text.contains("private val invoiceRepository: InvoiceRepository"))
-        assertTrue(text.contains("private val statementRepository: StatementRepository"))
+        val text4 = VfsUtilCore.loadText(useCaseFile!!)
+        assertTrue(text4.contains("import com.jkjamies.features.billing.domain.repository.InvoiceRepository"))
+        assertTrue(text4.contains("import com.jkjamies.features.billing.domain.repository.StatementRepository"))
+        assertTrue(text4.contains("private val invoiceRepository: InvoiceRepository"))
+        assertTrue(text4.contains("private val statementRepository: StatementRepository"))
+        assertFalse("Unreplaced placeholders in use case", text4.contains("${'$'}{"))
     }
 
     fun testGenerateAppendsSuffixWhenMissing() {
@@ -251,8 +254,9 @@ class UseCaseGeneratorTests : LightPlatformTestCase() {
             vfsRoot
         )
         assertNotNull(useCaseFile)
-        val text = VfsUtilCore.loadText(useCaseFile!!)
-        assertTrue(text.contains("class SyncSettingsUseCase"))
+        val text3 = VfsUtilCore.loadText(useCaseFile!!)
+        assertTrue(text3.contains("class SyncSettingsUseCase"))
+        assertFalse("Unreplaced placeholders in use case", text3.contains("${'$'}{"))
     }
 
     fun testGenerateDetectsOrgFromSiblingIfMissingInDomain() {

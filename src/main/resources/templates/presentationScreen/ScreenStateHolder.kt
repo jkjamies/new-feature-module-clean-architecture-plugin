@@ -1,5 +1,5 @@
 package ${PACKAGE}.${FOLDER}
 
-class ${SCREEN_NAME}StateHolder {
+internal class ${SCREEN_NAME}StateHolder {
     // TODO: state for ${SCREEN_NAME}
 }
