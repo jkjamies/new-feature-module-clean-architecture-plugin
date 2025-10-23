@@ -1,6 +1,5 @@
 package com.github.jkjamies.cammp.feature.presentationgenerator.ui
 
-import com.github.jkjamies.cammp.feature.cleanarchitecture.util.GradlePathUtil
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
@@ -11,7 +10,13 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.DocumentAdapter
-import com.intellij.ui.components.*
+import com.intellij.ui.JBColor
+import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBPanel
+import com.intellij.ui.components.JBRadioButton
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
@@ -21,6 +26,7 @@ import java.nio.file.Paths
 import javax.swing.ButtonGroup
 import javax.swing.JComponent
 import javax.swing.JPanel
+import javax.swing.ScrollPaneConstants
 import javax.swing.event.DocumentEvent
 
 /**
@@ -53,6 +59,8 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
         preferredSize = JBUI.size(600, 160)
         minimumSize = JBUI.size(400, 120)
         border = JBUI.Borders.empty()
+        verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
+        horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
     }
     private val useCaseCheckboxes = mutableListOf<Pair<JBCheckBox, UseCaseItem>>()
 
@@ -63,6 +71,12 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
         title = "Generate Presentation Screen"
         isResizable = true
         init()
+
+        // Group architecture radio buttons (MVI/MVVM)
+        ButtonGroup().apply {
+            add(rbMvvm)
+            add(rbMvi)
+        }
 
         // Default the directory field to the current project so chooser opens there
         project.basePath?.let { dirField.text = it }
@@ -106,7 +120,8 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
             }
         })
 
-        val group = ButtonGroup().apply {
+        // Group DI radio buttons (Hilt/Koin)
+        ButtonGroup().apply {
             add(rbHilt)
             add(rbKoin)
         }
@@ -165,17 +180,21 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
         c.gridx = 0; c.gridwidth = 2
         form.add(patternOptions, c); c.gridy += 1
 
-        // Spacer before UseCase list section
-        val spacerUseCases = JBPanel<JBPanel<*>>()
-        spacerUseCases.preferredSize = JBUI.size(1, JBUI.scale(12))
+        // Stronger divider before UseCase list section
+        val dividerBeforeUseCases = createDivider()
         c.gridx = 0; c.gridwidth = 2
-        form.add(spacerUseCases, c); c.gridy += 1
+        form.add(dividerBeforeUseCases, c); c.gridy += 1
 
         // Domain UseCases selection (across project)
         c.gridx = 0; c.gridwidth = 2
         form.add(JBLabel("Domain UseCases (across project):"), c); c.gridy += 1
         c.gridx = 0; c.gridwidth = 2
         form.add(useCasesScroll, c); c.gridy += 1
+
+        // Stronger divider after UseCase list section
+        val dividerAfterUseCases = createDivider()
+        c.gridx = 0; c.gridwidth = 2
+        form.add(dividerAfterUseCases, c); c.gridy += 1
 
         // Dependency Injection title + options below (full width)
         c.gridx = 0; c.gridwidth = 2
@@ -195,6 +214,18 @@ class GenerateScreenDialog(private val project: Project) : DialogWrapper(project
 
         panel.add(form, BorderLayout.CENTER)
         return panel
+    }
+
+    // Creates a visible horizontal divider that adapts to theme colors
+    private fun createDivider(): JComponent {
+        return JBPanel<JBPanel<*>>().apply {
+            isOpaque = true
+            background = JBColor.border()
+            preferredSize = JBUI.size(1, JBUI.scale(2))
+            minimumSize = JBUI.size(1, JBUI.scale(2))
+            maximumSize = JBUI.size(Int.MAX_VALUE, JBUI.scale(2))
+            border = JBUI.Borders.empty(8, 0)
+        }
     }
 
     private fun updateDiControls() {

@@ -229,31 +229,6 @@ class PresentationScreenGenerator(private val project: Project) {
         return "Presentation screen '$screenName' generated under $targetDirRelativeToProject."
     }
 
-    // Backwards-compatible overload to preserve the original signature used by tests
-    fun generate(
-        projectBasePath: String,
-        targetDirRelativeToProject: String,
-        screenName: String,
-        addNavigation: Boolean,
-        useFlowStateHolder: Boolean,
-        useScreenStateHolder: Boolean,
-        diChoice: DiChoice,
-        koinAnnotations: Boolean,
-        patternChoice: PatternChoice
-    ): String = generate(
-        projectBasePath = projectBasePath,
-        targetDirRelativeToProject = targetDirRelativeToProject,
-        screenName = screenName,
-        addNavigation = addNavigation,
-        useFlowStateHolder = useFlowStateHolder,
-        useScreenStateHolder = useScreenStateHolder,
-        diChoice = diChoice,
-        koinAnnotations = koinAnnotations,
-        patternChoice = patternChoice,
-        selectedUseCaseFqns = emptyList(),
-        selectedUseCaseModulePaths = emptySet()
-    )
-
     private fun addDependenciesForUseCases(
         moduleDir: VirtualFile,
         rootDirName: String,
