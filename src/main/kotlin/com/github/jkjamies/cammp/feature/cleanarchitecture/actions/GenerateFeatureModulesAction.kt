@@ -55,6 +55,7 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
 
         WriteCommandAction.runWriteCommandAction(project) {
             try {
+                val rootScripts = dialog.getRootScriptsSelection()
                 val resultMsg = FeatureModulesGenerator(project).generate(
                     basePath,
                     rootName,
@@ -65,7 +66,8 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
                     dsRemote,
                     dsLocal,
                     includeDi,
-                    orgSegment
+                    orgSegment,
+                    rootScripts
                 )
                 Messages.showInfoMessage(project, resultMsg, "Success")
             } catch (t: Throwable) {

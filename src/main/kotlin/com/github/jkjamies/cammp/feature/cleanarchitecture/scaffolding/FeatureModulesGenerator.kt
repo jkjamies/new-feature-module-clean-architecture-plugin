@@ -4,6 +4,7 @@ import com.github.jkjamies.cammp.feature.cleanarchitecture.util.GradlePathUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 
 /**
  * Coordinates scaffolding of feature modules and updating Gradle settings.
@@ -15,6 +16,55 @@ import com.intellij.openapi.vfs.VfsUtil
 class FeatureModulesGenerator(private val project: Project) {
     private val moduleScaffolder = ModuleScaffolder()
     private val settingsUpdater = SettingsUpdater()
+
+    private fun ensureRootScriptAndApply(
+        projectBasePath: String,
+        baseDir: VirtualFile,
+        moduleDir: VirtualFile,
+        scriptPathInput: String
+    ) {
+        val normalizedInput = scriptPathInput.trim()
+        if (normalizedInput.isEmpty()) return
+        val p = try { java.nio.file.Paths.get(normalizedInput) } catch (t: Throwable) { null }
+        val isAbs = p?.isAbsolute == true
+        val fullPath = if (isAbs) p!!.normalize().toString() else java.nio.file.Paths.get(projectBasePath, normalizedInput).normalize().toString()
+        val fullPathUnix = fullPath.replace('\\', '/')
+        val baseUnix = projectBasePath.replace('\\', '/')
+
+        // Ensure the root script file exists (create if missing)
+        val parentDirPath = fullPathUnix.substringBeforeLast('/', missingDelimiterValue = baseUnix)
+        val fileName = fullPathUnix.substringAfterLast('/')
+        val parentDirVf = VfsUtil.createDirectories(parentDirPath)
+        val existingScript = parentDirVf.findChild(fileName)
+        val scriptFile = existingScript ?: parentDirVf.createChildData(this, fileName)
+        // if created empty, make sure it has at least a comment header so it's not blank
+        if (existingScript == null) {
+            VfsUtil.saveText(scriptFile, "// Root script for ${moduleDir.name}\n")
+        }
+
+        // Ensure apply(from = rootProject.file("...")) is present in module build.gradle.kts
+        val buildFile = moduleDir.findChild("build.gradle.kts") ?: moduleDir.createChildData(this, "build.gradle.kts")
+        val current = try { VfsUtil.loadText(buildFile) } catch (_: Throwable) { "" }
+
+        val relPathUnix = if (fullPathUnix.startsWith(baseUnix)) {
+            val rel = fullPathUnix.removePrefix(baseUnix).trimStart('/')
+            rel
+        } else {
+            // cannot relativize, use as provided (may be absolute)
+            fullPathUnix
+        }
+        val applyLine = "apply(from = rootProject.file(\"$relPathUnix\"))"
+        val already = current.contains(applyLine)
+        if (!already) {
+            val updated = if (current.isEmpty()) {
+                applyLine + "\n"
+            } else {
+                // Ensure a blank line between the apply and the rest of the file
+                applyLine + "\n\n" + current
+            }
+            VfsUtil.saveText(buildFile, updated)
+        }
+    }
 
     /**
      * Generates the standard module set under the given root/feature, creating missing
@@ -29,6 +79,7 @@ class FeatureModulesGenerator(private val project: Project) {
      * @param datasourceRemote if true, include a "remoteDataSource" module (ignored when combined)
      * @param datasourceLocal if true, include a "localDataSource" module (ignored when combined)
      * @param includeDi whether to include the "di" module
+     * @param rootScripts optional mapping of module name to a root Gradle script file path (absolute or project-relative)
      * @return human-friendly summary of the work performed
      */
     fun generate(
@@ -40,31 +91,9 @@ class FeatureModulesGenerator(private val project: Project) {
         datasourceCombined: Boolean = false,
         datasourceRemote: Boolean = false,
         datasourceLocal: Boolean = false,
-        includeDi: Boolean = true
-    ): String = generate(
-        projectBasePath,
-        rootName,
-        featureName,
-        includePresentation,
-        includeDatasource,
-        datasourceCombined,
-        datasourceRemote,
-        datasourceLocal,
-        includeDi,
-        orgSegment = "jkjamies"
-    )
-
-    fun generate(
-        projectBasePath: String,
-        rootName: String,
-        featureName: String,
-        includePresentation: Boolean = true,
-        includeDatasource: Boolean = false,
-        datasourceCombined: Boolean = false,
-        datasourceRemote: Boolean = false,
-        datasourceLocal: Boolean = false,
         includeDi: Boolean = true,
-        orgSegment: String
+        orgSegment: String = "jkjamies",
+        rootScripts: Map<String, String> = emptyMap()
     ): String {
         val lfs = LocalFileSystem.getInstance()
         val baseDir = lfs.refreshAndFindFileByPath(projectBasePath)
@@ -99,13 +128,12 @@ class FeatureModulesGenerator(private val project: Project) {
         modules.forEach { name ->
             // check presence via VFS to avoid re-scaffolding
             val existed = featureVf.findChild(name) != null
-            if (!existed) {
-                val moduleDir = VfsUtil.createDirectoryIfMissing(featureVf, name)
-                    // defensive: VFS could return null on failure
+            val moduleDir = if (!existed) {
+                val md = VfsUtil.createDirectoryIfMissing(featureVf, name)
                     ?: error("Failed to create module directory: $name")
                 // generate build file, src tree, and placeholder
                 moduleScaffolder.scaffoldModule(
-                    moduleDir,
+                    md,
                     name,
                     rootName,
                     featureName,
@@ -116,7 +144,17 @@ class FeatureModulesGenerator(private val project: Project) {
                     datasourceLocal = datasourceLocal
                 )
                 created.add(name)
+                md
+            } else {
+                featureVf.findChild(name) ?: error("Module directory not found after existence check: $name")
             }
+
+            // If root script mapping provided for this module, ensure script exists and apply-from is added
+            val scriptPathInput = rootScripts[name]
+            if (!scriptPathInput.isNullOrBlank()) {
+                ensureRootScriptAndApply(projectBasePath, baseDir, moduleDir, scriptPathInput)
+            }
+
             // compute :root:feature:module path
             pathsToInclude.add(GradlePathUtil.gradlePathFor(projectBasePath, featureVf.path, name))
         }

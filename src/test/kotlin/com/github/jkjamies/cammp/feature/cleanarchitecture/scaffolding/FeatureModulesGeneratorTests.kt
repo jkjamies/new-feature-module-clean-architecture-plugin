@@ -18,7 +18,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         val generator = FeatureModulesGenerator(project)
         // generation touches VFS; run in write context
         val message = WriteAction.compute<String, RuntimeException> {
-            generator.generate(projectRootVf.path, "features", "payments")
+            generator.generate(projectRootVf.path, "features", "payments", includePresentation = true, includeDatasource = false, datasourceCombined = false, datasourceRemote = false, datasourceLocal = false, includeDi = true, orgSegment = "jkjamies", rootScripts = emptyMap())
         }
         assertTrue(message.contains("updated settings.gradle"))
 
@@ -45,7 +45,7 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
 
         val generator = FeatureModulesGenerator(project)
         WriteAction.compute<String, RuntimeException> {
-            generator.generate(projectRootVf.path, "features", "orders", includePresentation = false)
+            generator.generate(projectRootVf.path, "features", "orders", includePresentation = false, orgSegment = "jkjamies", rootScripts = emptyMap())
         }
 
         val featureDir = VfsUtil.findRelativeFile("features/orders", projectRootVf)
@@ -84,7 +84,10 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
                 includeDatasource = true,
                 datasourceCombined = true,
                 datasourceRemote = false,
-                datasourceLocal = false
+                datasourceLocal = false,
+                includeDi = true,
+                orgSegment = "jkjamies",
+                rootScripts = emptyMap()
             )
         }
 
@@ -132,7 +135,10 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
                 includeDatasource = true,
                 datasourceCombined = false,
                 datasourceRemote = true,
-                datasourceLocal = true
+                datasourceLocal = true,
+                includeDi = true,
+                orgSegment = "jkjamies",
+                rootScripts = emptyMap()
             )
         }
 
@@ -180,7 +186,10 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
                 includeDatasource = true,
                 datasourceCombined = false,
                 datasourceRemote = true,
-                datasourceLocal = false
+                datasourceLocal = false,
+                includeDi = true,
+                orgSegment = "jkjamies",
+                rootScripts = emptyMap()
             )
         }
 
@@ -220,7 +229,10 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
                 includeDatasource = true,
                 datasourceCombined = false,
                 datasourceRemote = false,
-                datasourceLocal = true
+                datasourceLocal = true,
+                includeDi = true,
+                orgSegment = "jkjamies",
+                rootScripts = emptyMap()
             )
         }
 
