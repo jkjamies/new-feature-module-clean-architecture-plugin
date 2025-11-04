@@ -51,12 +51,9 @@ class ModuleScaffolder {
             "localDataSource" -> "localDataSource"
             else -> "domain"
         }
-        // Prefer new organized location under template/cleanArchitecture, with fallbacks for compatibility
+        // Use organized location under templates/cleanArchitecture/module only
         val candidatePaths = listOf(
-            "template/cleanArchitecture/${templateName}.gradle.kts",
-            "templates/cleanArchitecture/${templateName}.gradle.kts",
-            "templates/gradle/${templateName}.gradle.kts",
-            "templates/${templateName}.gradle.kts"
+            "templates/cleanArchitecture/module/${templateName}.gradle.kts"
         )
         val originalTemplate = run {
             var text: String? = null

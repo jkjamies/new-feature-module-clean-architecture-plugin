@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import java.nio.file.Paths
 
 /**
  * Coordinates scaffolding of feature modules and updating Gradle settings.
@@ -17,42 +18,95 @@ class FeatureModulesGenerator(private val project: Project) {
     private val moduleScaffolder = ModuleScaffolder()
     private val settingsUpdater = SettingsUpdater()
 
-    private fun ensureRootScriptAndApply(
+    private fun normalizeToAbsolute(projectBasePath: String, inputPath: String): String {
+        val p = try { Paths.get(inputPath) } catch (t: Throwable) { null }
+        val abs = if (p?.isAbsolute == true) p.normalize() else Paths.get(projectBasePath, inputPath).normalize()
+        return abs.toString().replace('\\', '/')
+    }
+
+    private fun loadRootTemplateTextFor(moduleName: String): String {
+        val name = when (moduleName) {
+            "domain" -> "domain"
+            "data" -> "data"
+            "di" -> "di"
+            "presentation" -> "presentation"
+            "dataSource" -> "dataSource"
+            "remoteDataSource" -> "remoteDataSource"
+            "localDataSource" -> "localDataSource"
+            else -> "domain"
+        }
+        // Root templates are always under templates/cleanArchitecture/root
+        val candidates = listOf(
+            "/templates/cleanArchitecture/root/$name.gradle.kts",
+            "templates/cleanArchitecture/root/$name.gradle.kts"
+        )
+        candidates.forEach { p ->
+            try {
+                val viaRes = this::class.java.getResource(p)?.readText()
+                if (viaRes != null) return viaRes
+                val viaCl = this::class.java.classLoader.getResource(p.removePrefix("/"))?.readText()
+                if (viaCl != null) return viaCl
+            } catch (_: Throwable) { }
+        }
+        return "" // fallback to blank if unavailable
+    }
+
+    /**
+     * Pre-create root Gradle script files once across all selected modules according to rules:
+     * - If a path is selected by multiple modules, create a single blank file (if missing).
+     * - If a path is selected by only one module, create from the corresponding root template (if missing).
+     * Never overwrite existing files.
+     */
+    private fun prepareRootScripts(
         projectBasePath: String,
-        baseDir: VirtualFile,
+        selections: Map<String, String>
+    ) {
+        if (selections.isEmpty()) return
+        // Normalize all paths to absolute Unix-style and group by target file
+        data class Target(val absPath: String, val fileName: String, val dirPath: String)
+        val grouped = mutableMapOf<String, MutableList<String>>() // absPath -> moduleNames
+        val targets = mutableMapOf<String, Target>()
+        selections.forEach { (moduleName, input) ->
+            val abs = normalizeToAbsolute(projectBasePath, input)
+            val dir = abs.substringBeforeLast('/', projectBasePath.replace('\\','/'))
+            val file = abs.substringAfterLast('/')
+            grouped.getOrPut(abs) { mutableListOf() }.add(moduleName)
+            targets.putIfAbsent(abs, Target(abs, file, dir))
+        }
+        grouped.forEach { (abs, modules) ->
+            val t = targets[abs] ?: return@forEach
+            val parentDirVf = VfsUtil.createDirectories(t.dirPath)
+            val existing = parentDirVf.findChild(t.fileName)
+            if (existing != null) return@forEach // do not overwrite
+            val file = parentDirVf.createChildData(this, t.fileName)
+            val content = if (modules.size > 1) {
+                "" // blank file for duplicates
+            } else {
+                loadRootTemplateTextFor(modules.first())
+            }
+            VfsUtil.saveText(file, content)
+        }
+    }
+
+    private fun ensureApplyAtTop(
+        projectBasePath: String,
         moduleDir: VirtualFile,
         scriptPathInput: String
     ) {
-        val normalizedInput = scriptPathInput.trim()
-        if (normalizedInput.isEmpty()) return
-        val p = try { java.nio.file.Paths.get(normalizedInput) } catch (t: Throwable) { null }
-        val isAbs = p?.isAbsolute == true
-        val fullPath = if (isAbs) p!!.normalize().toString() else java.nio.file.Paths.get(projectBasePath, normalizedInput).normalize().toString()
-        val fullPathUnix = fullPath.replace('\\', '/')
-        val baseUnix = projectBasePath.replace('\\', '/')
-
-        // Ensure the root script file exists (create if missing)
-        val parentDirPath = fullPathUnix.substringBeforeLast('/', missingDelimiterValue = baseUnix)
-        val fileName = fullPathUnix.substringAfterLast('/')
-        val parentDirVf = VfsUtil.createDirectories(parentDirPath)
-        val existingScript = parentDirVf.findChild(fileName)
-        val scriptFile = existingScript ?: parentDirVf.createChildData(this, fileName)
-        // if created empty, make sure it has at least a comment header so it's not blank
-        if (existingScript == null) {
-            VfsUtil.saveText(scriptFile, "// Root script for ${moduleDir.name}\n")
+        val fullPathUnix = normalizeToAbsolute(projectBasePath, scriptPathInput)
+        // Compute project-relative path robustly
+        val relPathUnix = try {
+            val basePath = Paths.get(projectBasePath).toAbsolutePath().normalize()
+            val targetPath = Paths.get(fullPathUnix).toAbsolutePath().normalize()
+            if (targetPath.startsWith(basePath)) basePath.relativize(targetPath).toString().replace('\\', '/') else fullPathUnix
+        } catch (t: Throwable) {
+            // Fallback to previous logic if anything goes wrong
+            val baseUnix = projectBasePath.replace('\\', '/')
+            if (fullPathUnix.startsWith(baseUnix)) fullPathUnix.removePrefix(baseUnix).trimStart('/') else fullPathUnix
         }
-
         // Ensure apply(from = rootProject.file("...")) is present in module build.gradle.kts
         val buildFile = moduleDir.findChild("build.gradle.kts") ?: moduleDir.createChildData(this, "build.gradle.kts")
         val current = try { VfsUtil.loadText(buildFile) } catch (_: Throwable) { "" }
-
-        val relPathUnix = if (fullPathUnix.startsWith(baseUnix)) {
-            val rel = fullPathUnix.removePrefix(baseUnix).trimStart('/')
-            rel
-        } else {
-            // cannot relativize, use as provided (may be absolute)
-            fullPathUnix
-        }
         val applyLine = "apply(from = rootProject.file(\"$relPathUnix\"))"
         val already = current.contains(applyLine)
         if (!already) {
@@ -125,6 +179,9 @@ class FeatureModulesGenerator(private val project: Project) {
         // collect Gradle include paths for settings.gradle
         val pathsToInclude = mutableListOf<String>()
 
+        // Pre-create root script files once based on selections (templates vs blank for duplicates)
+        prepareRootScripts(projectBasePath, rootScripts)
+
         modules.forEach { name ->
             // check presence via VFS to avoid re-scaffolding
             val existed = featureVf.findChild(name) != null
@@ -152,7 +209,7 @@ class FeatureModulesGenerator(private val project: Project) {
             // If root script mapping provided for this module, ensure script exists and apply-from is added
             val scriptPathInput = rootScripts[name]
             if (!scriptPathInput.isNullOrBlank()) {
-                ensureRootScriptAndApply(projectBasePath, baseDir, moduleDir, scriptPathInput)
+                ensureApplyAtTop(projectBasePath, moduleDir, scriptPathInput)
             }
 
             // compute :root:feature:module path

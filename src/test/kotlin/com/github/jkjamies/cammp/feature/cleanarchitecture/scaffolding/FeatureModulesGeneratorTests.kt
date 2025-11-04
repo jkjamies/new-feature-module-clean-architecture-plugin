@@ -295,4 +295,115 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
         assertFalse(content.contains("include(\":features:billing:di\")"))
     }
 
+
+    fun testRootScriptsUniqueCreatesFromTemplateAndPrependsApply() {
+        val tempProject = Files.createTempDirectory("feature-generator-root-unique").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+            ?: error("project root VFS not found")
+
+        val generator = FeatureModulesGenerator(project)
+        WriteAction.compute<String, RuntimeException> {
+            generator.generate(
+                projectRootVf.path,
+                "features",
+                "profile",
+                includePresentation = true,
+                includeDatasource = false,
+                datasourceCombined = false,
+                datasourceRemote = false,
+                datasourceLocal = false,
+                includeDi = true,
+                orgSegment = "jkjamies",
+                rootScripts = mapOf(
+                    // only presentation uses a unique root script here
+                    "presentation" to "scripts/presentation.gradle.kts"
+                )
+            )
+        }
+
+        val scriptsDir = VfsUtil.createDirectories(projectRootVf.path + "/scripts")
+        val script = scriptsDir.findChild("presentation.gradle.kts") ?: error("root script not created")
+        val scriptText = VfsUtil.loadText(script)
+        assertTrue("Template-based root script should not be blank", scriptText.isNotBlank())
+        assertTrue("Template should contain plugins block", scriptText.contains("plugins"))
+
+        val featureDir = VfsUtil.findRelativeFile("features/profile", projectRootVf) ?: error("Feature dir missing")
+        val pres = featureDir.findChild("presentation") ?: error("presentation module missing")
+        val buildFile = pres.findChild("build.gradle.kts") ?: error("presentation build file missing")
+        val buildText = VfsUtil.loadText(buildFile)
+        val firstLine = buildText.lineSequence().first()
+        assertTrue("Apply should be the first line", firstLine.trimStart().startsWith("apply("))
+        assertTrue("Apply line should reference presentation.gradle.kts", firstLine.contains("presentation.gradle.kts"))
+        assertTrue("There should be a blank line after apply line", buildText.startsWith(firstLine + "\n\n"))
+    }
+
+    fun testRootScriptsDuplicateCreatesBlankAndAppliesToBoth() {
+        val tempProject = Files.createTempDirectory("feature-generator-root-duplicate").toFile()
+        val projectRootVf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempProject)
+            ?: error("project root VFS not found")
+
+        val generator = FeatureModulesGenerator(project)
+        WriteAction.compute<String, RuntimeException> {
+            generator.generate(
+                projectRootVf.path,
+                "features",
+                "checkout",
+                includePresentation = false,
+                includeDatasource = false,
+                datasourceCombined = false,
+                datasourceRemote = false,
+                datasourceLocal = false,
+                includeDi = true,
+                orgSegment = "jkjamies",
+                rootScripts = mapOf(
+                    // duplicate path for two layers
+                    "domain" to "scripts/shared.gradle.kts",
+                    "data" to "scripts/shared.gradle.kts"
+                )
+            )
+        }
+
+        val scriptsDir = VfsUtil.createDirectories(projectRootVf.path + "/scripts")
+        val script = scriptsDir.findChild("shared.gradle.kts") ?: error("shared root script not created")
+        val scriptText = VfsUtil.loadText(script)
+        assertEquals("", scriptText) // must be blank when selected by multiple layers
+
+        val featureDir = VfsUtil.findRelativeFile("features/checkout", projectRootVf) ?: error("Feature dir missing")
+        val domain = featureDir.findChild("domain") ?: error("domain module missing")
+        val data = featureDir.findChild("data") ?: error("data module missing")
+        val domainBuild = domain.findChild("build.gradle.kts") ?: error("domain build file missing")
+        val dataBuild = data.findChild("build.gradle.kts") ?: error("data build file missing")
+        val domainText = VfsUtil.loadText(domainBuild)
+        val dataText = VfsUtil.loadText(dataBuild)
+        val firstDomain = domainText.lineSequence().first()
+        val firstData = dataText.lineSequence().first()
+        assertTrue(firstDomain.trimStart().startsWith("apply("))
+        assertTrue(firstDomain.contains("shared.gradle.kts"))
+        assertTrue(firstData.trimStart().startsWith("apply("))
+        assertTrue(firstData.contains("shared.gradle.kts"))
+
+        // Idempotency: run again and ensure no duplication
+        WriteAction.compute<String, RuntimeException> {
+            generator.generate(
+                projectRootVf.path,
+                "features",
+                "checkout",
+                includePresentation = false,
+                includeDatasource = false,
+                datasourceCombined = false,
+                datasourceRemote = false,
+                datasourceLocal = false,
+                includeDi = true,
+                orgSegment = "jkjamies",
+                rootScripts = mapOf(
+                    "domain" to "scripts/shared.gradle.kts",
+                    "data" to "scripts/shared.gradle.kts"
+                )
+            )
+        }
+        val domainText2 = VfsUtil.loadText(domainBuild)
+        val dataText2 = VfsUtil.loadText(dataBuild)
+        assertEquals(domainText, domainText2)
+        assertEquals(dataText, dataText2)
+    }
 }

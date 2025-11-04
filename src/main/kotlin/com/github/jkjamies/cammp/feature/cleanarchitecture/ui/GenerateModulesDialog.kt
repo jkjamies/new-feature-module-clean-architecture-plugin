@@ -181,6 +181,10 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         selectedModuleKeys().forEach { key ->
             val label = JBLabel("$key root script:")
             val field = rootScriptsRows[key] ?: return@forEach
+            // Prefill suggestion if empty
+            if (field.text.trim().isEmpty()) {
+                field.text = "scripts/${key}.gradle.kts"
+            }
             gc.gridx = 0; gc.gridy = row; gc.weightx = 0.0
             rootScriptsContentPanel.add(label, gc)
             gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0
