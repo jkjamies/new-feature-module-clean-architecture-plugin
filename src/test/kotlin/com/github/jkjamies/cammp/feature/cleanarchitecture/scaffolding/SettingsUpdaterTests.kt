@@ -65,4 +65,48 @@ class SettingsUpdaterTests : LightPlatformTestCase() {
         assertEquals(1, Regex("^${Regex.escape(domainLine)}$", RegexOption.MULTILINE).findAll(content).count())
         assertEquals(1, Regex("^${Regex.escape(dataLine)}$", RegexOption.MULTILINE).findAll(content).count())
     }
+
+    fun testUpdateRootSettingsIncludeBuildAddsKts() {
+        val tempRoot = Files.createTempDirectory("settings-updater-test-includebuild-kts").toFile()
+        val vfRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempRoot)
+            ?: error("root VFS not found")
+
+        val settingsFile = WriteAction.compute<VirtualFile, RuntimeException> {
+            val f = vfRoot.createChildData(this, "settings.gradle.kts")
+            VfsUtil.saveText(f, "rootProject.name = \"demo\"\n")
+            f
+        }
+
+        val updater = SettingsUpdater()
+        WriteAction.run<RuntimeException> {
+            updater.updateRootSettingsIncludeBuild(vfRoot.path, "build-logic")
+            updater.updateRootSettingsIncludeBuild(vfRoot.path, "build-logic")
+        }
+
+        val content = VfsUtil.loadText(settingsFile)
+        val line = "includeBuild(\"build-logic\")"
+        assertEquals(1, Regex("^${Regex.escape(line)}$", RegexOption.MULTILINE).findAll(content).count())
+    }
+
+    fun testUpdateRootSettingsIncludeBuildAddsGroovy() {
+        val tempRoot = Files.createTempDirectory("settings-updater-test-includebuild-groovy").toFile()
+        val vfRoot = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempRoot)
+            ?: error("root VFS not found")
+
+        val settingsFile = WriteAction.compute<VirtualFile, RuntimeException> {
+            val f = vfRoot.createChildData(this, "settings.gradle")
+            VfsUtil.saveText(f, "rootProject.name = 'demo'\n")
+            f
+        }
+
+        val updater = SettingsUpdater()
+        WriteAction.run<RuntimeException> {
+            updater.updateRootSettingsIncludeBuild(vfRoot.path, "build-logic")
+            updater.updateRootSettingsIncludeBuild(vfRoot.path, "build-logic")
+        }
+
+        val content = VfsUtil.loadText(settingsFile)
+        val line = "includeBuild 'build-logic'"
+        assertEquals(1, Regex("^${Regex.escape(line)}$", RegexOption.MULTILINE).findAll(content).count())
+    }
 }
