@@ -71,7 +71,6 @@ class ModuleScaffolder {
         // Adapt template placeholders to match the computed package for all modules
         val buildText = originalTemplate
             .replace("NAMESPACE", packageName)
-            .replace("com.jkjamies.imgur.api", packageName)
             .replace("\${'$'}{PACKAGE}", safeOrg)
             .replace("PACKAGE", safeOrg)
 
