@@ -48,4 +48,30 @@ class SettingsUpdater {
             VfsUtil.saveText(file, builder.toString())
         }
     }
+
+    /**
+     * Ensures includeBuild for the given relative path (for example "build-logic") is present
+     * in the root settings file. Creates a Kotlin DSL settings.gradle.kts if missing.
+     */
+    fun updateRootSettingsIncludeBuild(projectBasePath: String, buildDir: String) {
+        val lfs = LocalFileSystem.getInstance()
+        val projectRootVf = lfs.findFileByPath(projectBasePath)
+            ?: error("Project root not found: $projectBasePath")
+
+        val settingsKts = projectRootVf.findChild("settings.gradle.kts")
+        val settingsGroovy = projectRootVf.findChild("settings.gradle")
+        val settingsFile = settingsKts ?: settingsGroovy
+        val isKts = settingsKts != null || (settingsGroovy == null)
+        val file = settingsFile ?: projectRootVf.createChildData(this, "settings.gradle.kts")
+        val current = VfsUtil.loadText(file)
+
+        val includeBuildLine = if (isKts) "includeBuild(\"$buildDir\")" else "includeBuild '$buildDir'"
+        if (!current.contains(includeBuildLine)) {
+            val updated = StringBuilder(current)
+            // Append on a new line to match include behavior
+            if (updated.isNotEmpty() && !updated.endsWith("\n")) updated.appendLine()
+            updated.appendLine(includeBuildLine)
+            VfsUtil.saveText(file, updated.toString())
+        }
+    }
 }

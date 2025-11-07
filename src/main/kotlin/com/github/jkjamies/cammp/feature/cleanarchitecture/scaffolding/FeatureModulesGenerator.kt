@@ -4,7 +4,6 @@ import com.github.jkjamies.cammp.feature.cleanarchitecture.util.GradlePathUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VirtualFile
 import java.nio.file.Paths
 
 /**
@@ -18,106 +17,154 @@ class FeatureModulesGenerator(private val project: Project) {
     private val moduleScaffolder = ModuleScaffolder()
     private val settingsUpdater = SettingsUpdater()
 
-    private fun normalizeToAbsolute(projectBasePath: String, inputPath: String): String {
-        val p = try { Paths.get(inputPath) } catch (t: Throwable) { null }
-        val abs = if (p?.isAbsolute == true) p.normalize() else Paths.get(projectBasePath, inputPath).normalize()
-        return abs.toString().replace('\\', '/')
+    private fun loadTemplateResource(path: String): String? {
+        return this::class.java.getResource(path)?.readText()
+            ?: this::class.java.classLoader.getResource(path.trimStart('/'))?.readText()
     }
 
-    private fun loadRootTemplateTextFor(moduleName: String): String {
-        val name = when (moduleName) {
-            "domain" -> "domain"
-            "data" -> "data"
-            "di" -> "di"
-            "presentation" -> "presentation"
-            "dataSource" -> "dataSource"
-            "remoteDataSource" -> "remoteDataSource"
-            "localDataSource" -> "localDataSource"
-            else -> "domain"
-        }
-        // Root templates are always under templates/cleanArchitecture/root
-        val candidates = listOf(
-            "/templates/cleanArchitecture/root/$name.gradle.kts",
-            "templates/cleanArchitecture/root/$name.gradle.kts"
-        )
-        candidates.forEach { p ->
-            try {
-                val viaRes = this::class.java.getResource(p)?.readText()
-                if (viaRes != null) return viaRes
-                val viaCl = this::class.java.classLoader.getResource(p.removePrefix("/"))?.readText()
-                if (viaCl != null) return viaCl
-            } catch (_: Throwable) { }
-        }
-        return "" // fallback to blank if unavailable
+    private fun applyPackagePlaceholder(text: String, safeOrg: String): String {
+        // Replace both ${PACKAGE} and bare PACKAGE tokens.
+        return text.replace(Regex("\\$\\{PACKAGE\\}"), safeOrg).replace("PACKAGE", safeOrg)
     }
 
-    /**
-     * Pre-create root Gradle script files once across all selected modules according to rules:
-     * - If a path is selected by multiple modules, create a single blank file (if missing).
-     * - If a path is selected by only one module, create from the corresponding root template (if missing).
-     * Never overwrite existing files.
-     */
-    private fun prepareRootScripts(
-        projectBasePath: String,
-        selections: Map<String, String>
-    ) {
-        if (selections.isEmpty()) return
-        // Normalize all paths to absolute Unix-style and group by target file
-        data class Target(val absPath: String, val fileName: String, val dirPath: String)
-        val grouped = mutableMapOf<String, MutableList<String>>() // absPath -> moduleNames
-        val targets = mutableMapOf<String, Target>()
-        selections.forEach { (moduleName, input) ->
-            val abs = normalizeToAbsolute(projectBasePath, input)
-            val dir = abs.substringBeforeLast('/', projectBasePath.replace('\\','/'))
-            val file = abs.substringAfterLast('/')
-            grouped.getOrPut(abs) { mutableListOf() }.add(moduleName)
-            targets.putIfAbsent(abs, Target(abs, file, dir))
-        }
-        grouped.forEach { (abs, modules) ->
-            val t = targets[abs] ?: return@forEach
-            val parentDirVf = VfsUtil.createDirectories(t.dirPath)
-            val existing = parentDirVf.findChild(t.fileName)
-            if (existing != null) return@forEach // do not overwrite
-            val file = parentDirVf.createChildData(this, t.fileName)
-            val content = if (modules.size > 1) {
-                "" // blank file for duplicates
-            } else {
-                loadRootTemplateTextFor(modules.first())
+    private fun createBuildLogicModule(projectBasePath: String, orgSegment: String, enabledModules: List<String>) {
+        // Create build-logic directory at project root
+        val lfs = LocalFileSystem.getInstance()
+        val baseDir = lfs.refreshAndFindFileByPath(projectBasePath) ?: return
+        val buildLogicVf = VfsUtil.createDirectoryIfMissing(baseDir, "build-logic") ?: return
+
+        // copy settings.gradle.kts and build.gradle.kts templates
+        val settingsText = loadTemplateResource("/templates/cleanArchitecture/buildLogic/settings.gradle.kts")
+        if (settingsText != null) {
+            if (buildLogicVf.findChild("settings.gradle.kts") == null) {
+                buildLogicVf.createChildData(this, "settings.gradle.kts").let { VfsUtil.saveText(it, settingsText) }
             }
-            VfsUtil.saveText(file, content)
         }
-    }
-
-    private fun ensureApplyAtTop(
-        projectBasePath: String,
-        moduleDir: VirtualFile,
-        scriptPathInput: String
-    ) {
-        val fullPathUnix = normalizeToAbsolute(projectBasePath, scriptPathInput)
-        // Compute project-relative path robustly
-        val relPathUnix = try {
-            val basePath = Paths.get(projectBasePath).toAbsolutePath().normalize()
-            val targetPath = Paths.get(fullPathUnix).toAbsolutePath().normalize()
-            if (targetPath.startsWith(basePath)) basePath.relativize(targetPath).toString().replace('\\', '/') else fullPathUnix
-        } catch (t: Throwable) {
-            // Fallback to previous logic if anything goes wrong
-            val baseUnix = projectBasePath.replace('\\', '/')
-            if (fullPathUnix.startsWith(baseUnix)) fullPathUnix.removePrefix(baseUnix).trimStart('/') else fullPathUnix
-        }
-        // Ensure apply(from = rootProject.file("...")) is present in module build.gradle.kts
-        val buildFile = moduleDir.findChild("build.gradle.kts") ?: moduleDir.createChildData(this, "build.gradle.kts")
-        val current = try { VfsUtil.loadText(buildFile) } catch (_: Throwable) { "" }
-        val applyLine = "apply(from = rootProject.file(\"$relPathUnix\"))"
-        val already = current.contains(applyLine)
-        if (!already) {
-            val updated = if (current.isEmpty()) {
-                applyLine + "\n"
-            } else {
-                // Ensure a blank line between the apply and the rest of the file
-                applyLine + "\n\n" + current
+        val buildTextTemplate = loadTemplateResource("/templates/cleanArchitecture/buildLogic/build.gradle.kts")
+        if (buildTextTemplate != null) {
+            val safeOrg = orgSegment.trim().ifEmpty { "jkjamies" }
+            // Build plugin registrations only for enabled modules
+            val registrations = buildString {
+                append("gradlePlugin {\n    plugins {\n")
+                fun reg(idSuffix: String, className: String, regName: String) {
+                    append("        register(\"$regName\") {\n")
+                    append("            id = \"com.$safeOrg.convention.android.library.$idSuffix\"\n")
+                    append("            implementationClass = \"com.$safeOrg.convention.$className\"\n")
+                    append("        }\n")
+                }
+                // Map modules to registrations
+                if (enabledModules.contains("data")) reg("data", "DataConventionPlugin", "androidLibraryDataConvention")
+                if (enabledModules.contains("di")) reg("di", "DiConventionPlugin", "androidLibraryDiConvention")
+                if (enabledModules.contains("domain")) reg("domain", "DomainConventionPlugin", "androidLibraryDomainConvention")
+                if (enabledModules.contains("presentation")) reg("presentation", "PresentationConventionPlugin", "androidLibraryPresentationConvention")
+                if (enabledModules.contains("dataSource")) reg("dataSource", "DataSourceConventionPlugin", "androidLibraryDataSourceConvention")
+                if (enabledModules.contains("remoteDataSource")) reg("remoteDataSource", "RemoteDataSourceConventionPlugin", "androidLibraryRemoteDataSourceConvention")
+                if (enabledModules.contains("localDataSource")) reg("localDataSource", "LocalDataSourceConventionPlugin", "androidLibraryLocalDataSourceConvention")
+                append("    }\n}\n")
             }
-            VfsUtil.saveText(buildFile, updated)
+            // Replace PACKAGE tokens and inject registrations by replacing gradlePlugin block if present
+            var buildText = applyPackagePlaceholder(buildTextTemplate, safeOrg)
+            val gpIndex = buildText.indexOf("gradlePlugin {")
+            if (gpIndex >= 0) {
+                // Replace from gradlePlugin start to end of file (template ends with the block)
+                buildText = buildText.substring(0, gpIndex) + registrations
+            } else {
+                // Append registrations if no block found
+                buildText = buildText + "\n" + registrations
+            }
+            if (buildLogicVf.findChild("build.gradle.kts") == null) {
+                buildLogicVf.createChildData(this, "build.gradle.kts").let { VfsUtil.saveText(it, buildText) }
+            }
         }
+
+        // create src/main/kotlin and copy convention plugin templates, replacing PACKAGE
+        val srcMain = VfsUtil.createDirectoryIfMissing(buildLogicVf, "src/main/kotlin") ?: return
+        val safeOrg = orgSegment.trim().ifEmpty { "jkjamies" }
+        val packageDirPath = srcMain.path + "/com/" + safeOrg.replace('.', '/') + "/convention"
+        val pkgDir = VfsUtil.createDirectories(packageDirPath)
+
+        // Always include shared defaults
+        val conventionFolderPath = "/templates/cleanArchitecture/buildLogic/conventionPlugins"
+        listOf("AndroidLibraryDefaults.kt").forEach { fname ->
+            val resPath = "$conventionFolderPath/$fname"
+            val text = loadTemplateResource(resPath) ?: return@forEach
+            val replaced = applyPackagePlaceholder(text, safeOrg)
+            if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+        }
+        // Conditionally include convention plugins matching enabled modules
+        if (enabledModules.contains("data")) {
+            listOf("DataConventionPlugin.kt").forEach { fname ->
+                val resPath = "$conventionFolderPath/$fname"
+                val text = loadTemplateResource(resPath) ?: return@forEach
+                val replaced = applyPackagePlaceholder(text, safeOrg)
+                if (pkgDir.findChild(fname) == null) {
+                    pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+                }
+            }
+        }
+        if (enabledModules.contains("di")) {
+            listOf("DIConventionPlugin.kt").forEach { fname ->
+                val resPath = "$conventionFolderPath/$fname"
+                val text = loadTemplateResource(resPath) ?: return@forEach
+                val replaced = applyPackagePlaceholder(text, safeOrg)
+                if (pkgDir.findChild(fname) == null) {
+                    pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+                }
+            }
+        }
+        if (enabledModules.contains("domain")) {
+            listOf("DomainConventionPlugin.kt").forEach { fname ->
+                val resPath = "$conventionFolderPath/$fname"
+                val text = loadTemplateResource(resPath) ?: return@forEach
+                val replaced = applyPackagePlaceholder(text, safeOrg)
+                if (pkgDir.findChild(fname) == null) {
+                    pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+                }
+            }
+        }
+        if (enabledModules.contains("presentation")) {
+            listOf("PresentationConventionPlugin.kt").forEach { fname ->
+                val resPath = "$conventionFolderPath/$fname"
+                val text = loadTemplateResource(resPath) ?: return@forEach
+                val replaced = applyPackagePlaceholder(text, safeOrg)
+                if (pkgDir.findChild(fname) == null) {
+                    pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+                }
+            }
+        }
+        if (enabledModules.contains("dataSource") || enabledModules.contains("remoteDataSource") || enabledModules.contains("localDataSource")) {
+            // include generic and specific datasource plugins as applicable
+            if (enabledModules.contains("dataSource")) {
+                val fname = "DataSourceConventionPlugin.kt"
+                val resPath = "$conventionFolderPath/$fname"
+                val text = loadTemplateResource(resPath) ?: ""
+                if (text.isNotEmpty()) {
+                    val replaced = applyPackagePlaceholder(text, safeOrg)
+                    if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+                }
+            }
+            if (enabledModules.contains("remoteDataSource")) {
+                val fname = "RemoteDataSourceConventionPlugin.kt"
+                val resPath = "$conventionFolderPath/$fname"
+                val text = loadTemplateResource(resPath) ?: ""
+                if (text.isNotEmpty()) {
+                    val replaced = applyPackagePlaceholder(text, safeOrg)
+                    if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+                }
+            }
+            if (enabledModules.contains("localDataSource")) {
+                val fname = "LocalDataSourceConventionPlugin.kt"
+                val resPath = "$conventionFolderPath/$fname"
+                val text = loadTemplateResource(resPath) ?: ""
+                if (text.isNotEmpty()) {
+                    val replaced = applyPackagePlaceholder(text, safeOrg)
+                    if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+                }
+            }
+        }
+
+        // refresh
+        buildLogicVf.refresh(true, true)
     }
 
     /**
@@ -133,7 +180,6 @@ class FeatureModulesGenerator(private val project: Project) {
      * @param datasourceRemote if true, include a "remoteDataSource" module (ignored when combined)
      * @param datasourceLocal if true, include a "localDataSource" module (ignored when combined)
      * @param includeDi whether to include the "di" module
-     * @param rootScripts optional mapping of module name to a root Gradle script file path (absolute or project-relative)
      * @return human-friendly summary of the work performed
      */
     fun generate(
@@ -146,8 +192,7 @@ class FeatureModulesGenerator(private val project: Project) {
         datasourceRemote: Boolean = false,
         datasourceLocal: Boolean = false,
         includeDi: Boolean = true,
-        orgSegment: String = "jkjamies",
-        rootScripts: Map<String, String> = emptyMap()
+        orgSegment: String = "jkjamies"
     ): String {
         val lfs = LocalFileSystem.getInstance()
         val baseDir = lfs.refreshAndFindFileByPath(projectBasePath)
@@ -179,13 +224,10 @@ class FeatureModulesGenerator(private val project: Project) {
         // collect Gradle include paths for settings.gradle
         val pathsToInclude = mutableListOf<String>()
 
-        // Pre-create root script files once based on selections (templates vs blank for duplicates)
-        prepareRootScripts(projectBasePath, rootScripts)
-
         modules.forEach { name ->
             // check presence via VFS to avoid re-scaffolding
             val existed = featureVf.findChild(name) != null
-            val moduleDir = if (!existed) {
+            if (!existed) {
                 val md = VfsUtil.createDirectoryIfMissing(featureVf, name)
                     ?: error("Failed to create module directory: $name")
                 // generate build file, src tree, and placeholder
@@ -201,23 +243,20 @@ class FeatureModulesGenerator(private val project: Project) {
                     datasourceLocal = datasourceLocal
                 )
                 created.add(name)
-                md
-            } else {
-                featureVf.findChild(name) ?: error("Module directory not found after existence check: $name")
             }
-
-            // If root script mapping provided for this module, ensure script exists and apply-from is added
-            val scriptPathInput = rootScripts[name]
-            if (!scriptPathInput.isNullOrBlank()) {
-                ensureApplyAtTop(projectBasePath, moduleDir, scriptPathInput)
-            }
-
             // compute :root:feature:module path
             pathsToInclude.add(GradlePathUtil.gradlePathFor(projectBasePath, featureVf.path, name))
         }
 
         // idempotently add includes
         settingsUpdater.updateRootSettingsIncludes(projectBasePath, pathsToInclude)
+
+        // Create build-logic module populated with convention plugins for the enabled layers
+        val enabledModules = modules // the modules list indicates which conventions are relevant
+        createBuildLogicModule(projectBasePath, orgSegment, enabledModules)
+
+        // ensure settings includeBuild("build-logic") is present
+        settingsUpdater.updateRootSettingsIncludeBuild(projectBasePath, "build-logic")
 
         // ensure the IDE reflects new directories/files
         featureVf.refresh(true, true)

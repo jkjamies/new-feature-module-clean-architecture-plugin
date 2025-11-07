@@ -91,115 +91,8 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         isVisible = true
     }
 
-    // Root Gradle scripts section
-    private val enableRootScriptsCheckBox = JBCheckBox("Enable root Gradle scripts for layers", false)
-    private val rootScriptsRows: MutableMap<String, TextFieldWithBrowseButton> = linkedMapOf(
-        "domain" to TextFieldWithBrowseButton(JBTextField()),
-        "data" to TextFieldWithBrowseButton(JBTextField()),
-        "di" to TextFieldWithBrowseButton(JBTextField()),
-        "presentation" to TextFieldWithBrowseButton(JBTextField()),
-        "dataSource" to TextFieldWithBrowseButton(JBTextField()),
-        "remoteDataSource" to TextFieldWithBrowseButton(JBTextField()),
-        "localDataSource" to TextFieldWithBrowseButton(JBTextField()),
-    )
-    private val rootScriptsContentPanel = JPanel(GridBagLayout())
-    private val rootScriptsPanel = JPanel(BorderLayout()).apply {
-        val scroll = javax.swing.JScrollPane(rootScriptsContentPanel).apply {
-            verticalScrollBarPolicy = javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
-            horizontalScrollBarPolicy = javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
-            border = JBUI.Borders.empty()
-        }
-        add(scroll, BorderLayout.CENTER)
-        isVisible = false
-        // Slightly taller to comfortably show last options
-        preferredSize = Dimension(JBUI.scale(640), JBUI.scale(220))
-        minimumSize = Dimension(JBUI.scale(480), JBUI.scale(160))
-    }
-
-    // Spacer at the very bottom to avoid controls touching dialog edge when root scripts are enabled
-    private val bottomSpacer = JPanel().apply {
-        preferredSize = Dimension(1, JBUI.scale(24))
-        minimumSize = Dimension(1, JBUI.scale(16))
-        isOpaque = false
-        isVisible = false
-    }
-
     private var adjustingDatasourceSelections = false
     private var adjustingDiSelections = false
-
-    private fun configureRootScriptChoosers() {
-        val basePath = projectBasePath
-        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
-        if (basePath != null) {
-            val baseVf = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath)
-            if (baseVf != null) descriptor.withRoots(baseVf)
-        }
-        rootScriptsRows.forEach { (name, tfbb) ->
-            tfbb.textField.columns = 36
-            tfbb.addActionListener {
-                val currentText = tfbb.text
-                val toSelect = if (currentText.isNotBlank()) VfsUtil.findFile(Paths.get(currentText).normalize(), true) else basePath?.let { VfsUtil.findFile(Paths.get(it), true) }
-                val file = FileChooser.chooseFile(descriptor, null, toSelect)
-                if (file != null) tfbb.text = file.path
-            }
-        }
-    }
-
-    private fun selectedModuleKeys(): List<String> {
-        val keys = mutableListOf<String>()
-        // Always include base modules
-        keys.add("domain")
-        keys.add("data")
-        if (getIncludeDi()) keys.add("di")
-        if (getIncludePresentation()) keys.add("presentation")
-        if (getIncludeDatasource()) {
-            if (isDatasourceCombinedSelected()) {
-                keys.add("dataSource")
-            } else {
-                if (isDatasourceRemoteSelected()) keys.add("remoteDataSource")
-                if (isDatasourceLocalSelected()) keys.add("localDataSource")
-            }
-        }
-        return keys
-    }
-
-    private fun updateRootScriptsRows() {
-        val enabled = enableRootScriptsCheckBox.isSelected
-        rootScriptsPanel.isVisible = enabled
-        bottomSpacer.isVisible = enabled
-        rootScriptsPanel.revalidate()
-        rootScriptsPanel.repaint()
-        rootScriptsContentPanel.removeAll()
-        if (!enabled) return
-        val gc = GridBagConstraints().apply {
-            anchor = GridBagConstraints.WEST
-            insets = JBUI.insets(4, 8)
-            fill = GridBagConstraints.HORIZONTAL
-            weightx = 1.0
-        }
-        var row = 0
-        selectedModuleKeys().forEach { key ->
-            val label = JBLabel("$key root script:")
-            val field = rootScriptsRows[key] ?: return@forEach
-            // Prefill suggestion if empty
-            if (field.text.trim().isEmpty()) {
-                field.text = "scripts/${key}.gradle.kts"
-            }
-            gc.gridx = 0; gc.gridy = row; gc.weightx = 0.0
-            rootScriptsContentPanel.add(label, gc)
-            gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0
-            rootScriptsContentPanel.add(field, gc)
-            row++
-        }
-        // filler to push up
-        val fillerGc = GridBagConstraints().apply {
-            gridx = 0; gridy = row; gridwidth = 2
-            weighty = 1.0
-        }
-        rootScriptsContentPanel.add(JPanel(), fillerGc)
-        rootScriptsContentPanel.revalidate()
-        rootScriptsContentPanel.repaint()
-    }
 
     init {
         title = "Generate Clean Architecture Modules"
@@ -254,7 +147,7 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         // Wire up datasource selection logic
         // Moved state update function to a private method for readability
 
-        includeDatasourceCheckBox.addItemListener { updateDatasourceStates(); updateRootScriptsRows() }
+        includeDatasourceCheckBox.addItemListener { updateDatasourceStates(); }
         combinedDatasourceCheckBox.addItemListener { e ->
             if (adjustingDatasourceSelections) return@addItemListener
             val selected = e.stateChange == ItemEvent.SELECTED
@@ -269,7 +162,6 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
                 }
             }
             updateDatasourceStates()
-            updateRootScriptsRows()
         }
         val remoteLocalListener = ItemListener {
             if (adjustingDatasourceSelections) return@ItemListener
@@ -284,13 +176,12 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
                 }
             }
             updateDatasourceStates()
-            updateRootScriptsRows()
         }
         remoteDatasourceCheckBox.addItemListener(remoteLocalListener)
         localDatasourceCheckBox.addItemListener(remoteLocalListener)
 
 
-        includeDiCheckBox.addItemListener { updateDiStates(); updateRootScriptsRows() }
+        includeDiCheckBox.addItemListener { updateDiStates(); }
         diHiltRadioButton.addItemListener { e ->
             if (adjustingDiSelections) return@addItemListener
             if (e.stateChange == ItemEvent.SELECTED) updateDiStates()
@@ -305,13 +196,6 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         // initialize visibility/enabled states on dialog creation
         updateDatasourceStates()
         updateDiStates()
-
-        // Root scripts UI wiring
-        enableRootScriptsCheckBox.addItemListener { updateRootScriptsRows() }
-        // Configure file choosers for all rows
-        configureRootScriptChoosers()
-        // Initialize rows based on defaults
-        updateRootScriptsRows()
 
         init()
         initValidation()
@@ -429,26 +313,14 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
         form.add(JBLabel("Presentation:"), gc)
         val presentationEnablePanel = JPanel().apply {
             layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
-            includePresentationCheckBox.addItemListener { updateRootScriptsRows() }
+            includePresentationCheckBox.addItemListener {  }
             add(includePresentationCheckBox)
         }
         gc.gridx = 0; gc.gridy = 12; gc.gridwidth = 2
         form.add(presentationEnablePanel, gc)
 
-        // Root Gradle scripts section (enable + scrollable list)
-        gc.gridx = 0; gc.gridy = 13; gc.gridwidth = 2
-        form.add(JBLabel("Root Gradle scripts:"), gc)
-        val rootScriptsEnablePanel = JPanel().apply {
-            layout = java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(8), 0)
-            add(enableRootScriptsCheckBox)
-        }
-        gc.gridx = 0; gc.gridy = 14; gc.gridwidth = 2
-        form.add(rootScriptsEnablePanel, gc)
-        gc.gridx = 0; gc.gridy = 15; gc.gridwidth = 2
-        form.add(rootScriptsPanel, gc)
-
         panel.add(form, BorderLayout.NORTH)
-        panel.add(bottomSpacer, BorderLayout.SOUTH)
+        // do not add bottom spacer (was used for root scripts)
         return panel
     }
 
@@ -476,23 +348,6 @@ class GenerateModulesDialog(project: Project) : DialogWrapper(project) {
     fun isDiHiltSelected(): Boolean = diHiltRadioButton.isSelected
     fun isDiKoinSelected(): Boolean = diKoinRadioButton.isSelected
     fun isDiKoinAnnotationsSelected(): Boolean = koinAnnotationsCheckBox.isSelected
-
-    // Root scripts getters
-    fun isRootScriptsEnabled(): Boolean = enableRootScriptsCheckBox.isSelected
-    /**
-     * Returns a map of moduleName -> scriptPath (as entered by user). Only includes modules currently configured
-     * and only entries with non-blank paths. Paths may be absolute or project-relative; the generator will normalize.
-     */
-    fun getRootScriptsSelection(): Map<String, String> {
-        if (!isRootScriptsEnabled()) return emptyMap()
-        val result = linkedMapOf<String, String>()
-        selectedModuleKeys().forEach { key ->
-            val tf = rootScriptsRows[key] ?: return@forEach
-            val text = tf.text.trim()
-            if (text.isNotBlank()) result[key] = text
-        }
-        return result
-    }
 
     // ---- Extracted helpers for readability ----
     private fun updateOrgPreview() {

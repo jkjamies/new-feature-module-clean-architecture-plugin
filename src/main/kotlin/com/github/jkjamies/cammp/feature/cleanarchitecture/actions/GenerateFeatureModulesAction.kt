@@ -55,7 +55,6 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
 
         WriteCommandAction.runWriteCommandAction(project) {
             try {
-                val rootScripts = dialog.getRootScriptsSelection()
                 val resultMsg = FeatureModulesGenerator(project).generate(
                     basePath,
                     rootName,
@@ -66,10 +65,23 @@ class GenerateFeatureModulesAction : AnAction("Generate Clean Architecture Modul
                     dsRemote,
                     dsLocal,
                     includeDi,
-                    orgSegment,
-                    rootScripts
+                    orgSegment
                 )
-                Messages.showInfoMessage(project, resultMsg, "Success")
+                // Append post-generation instructions about required plugin aliases in the project's version catalog
+                val extra = """
+                
+                Post-generation notes:
+                
+                Please ensure your project declares the plugin aliases used by the generated convention plugins in your version catalog (gradle/libs.versions.toml) and that the plugin aliases are available to the included build. Also add the following plugin aliases to your project plugin usage where appropriate (for example in settings.gradle.kts or root build files) with apply false:
+                
+                alias(libs.plugins.ksp) apply false
+                alias(libs.plugins.hilt) apply false
+                
+                In your version catalog (gradle/libs.versions.toml) you should define the corresponding plugin entries under [plugins], e.g. add aliases for ksp and hilt that point to the correct plugin IDs and versions for your project.
+                
+                """.trimIndent()
+
+                Messages.showInfoMessage(project, resultMsg + extra, "Success")
             } catch (t: Throwable) {
                 Messages.showErrorDialog(project, "Failed to generate modules: ${t.message}", "Error")
             }

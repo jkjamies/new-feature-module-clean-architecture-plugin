@@ -72,6 +72,8 @@ class ModuleScaffolder {
         val buildText = originalTemplate
             .replace("NAMESPACE", packageName)
             .replace("com.jkjamies.imgur.api", packageName)
+            .replace("\${'$'}{PACKAGE}", safeOrg)
+            .replace("PACKAGE", safeOrg)
 
         // avoid overwriting if user customized later
         FileUtilExt.writeFileIfAbsent(moduleDir, "build.gradle.kts", buildText)
