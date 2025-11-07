@@ -1,6 +1,5 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
+    id("com.PACKAGE.convention.android.library.domain")
 }
 
 android {
@@ -8,4 +7,5 @@ android {
 }
 
 dependencies {
+    // Add module-specific dependencies here as needed
 }
