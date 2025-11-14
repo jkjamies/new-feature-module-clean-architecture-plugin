@@ -45,6 +45,23 @@ class FeatureModulesGeneratorBuildLogicTests : LightPlatformTestCase() {
             val vf = srcMain.findChild(f) ?: error("$f missing in build-logic")
             val text = VfsUtil.loadText(vf)
             assertTrue(text.contains("package com.mcdonalds.convention"))
+            // Should import the helper when using configureAndroidLibraryDefaults()
+            if (text.contains("configureAndroidLibraryDefaults()")) {
+                assertTrue(text.contains("import com.mcdonalds.convention.helpers.configureAndroidLibraryDefaults"))
+            }
+        }
+
+        // helpers directory and files should exist with correct package
+        val helpersDir = srcMain.findChild("helpers") ?: error("helpers directory missing under convention")
+        val helperFiles = listOf(
+            "AndroidLibraryDefaults.kt",
+            "TestOptions.kt",
+            "StandardTestDependencies.kt"
+        )
+        helperFiles.forEach { hf ->
+            val vf = helpersDir.findChild(hf) ?: error("$hf missing in helpers")
+            val text = VfsUtil.loadText(vf)
+            assertTrue(text.contains("package com.mcdonalds.convention.helpers"))
         }
     }
 

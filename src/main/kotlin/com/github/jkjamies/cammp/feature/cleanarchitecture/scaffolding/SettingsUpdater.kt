@@ -65,13 +65,13 @@ class SettingsUpdater {
         val file = settingsFile ?: projectRootVf.createChildData(this, "settings.gradle.kts")
         val current = VfsUtil.loadText(file)
 
+        // Minimal behavior: only ensure a single includeBuild line for the provided path exists.
         val includeBuildLine = if (isKts) "includeBuild(\"$buildDir\")" else "includeBuild '$buildDir'"
-        if (!current.contains(includeBuildLine)) {
-            val updated = StringBuilder(current)
-            // Append on a new line to match include behavior
-            if (updated.isNotEmpty() && !updated.endsWith("\n")) updated.appendLine()
-            updated.appendLine(includeBuildLine)
-            VfsUtil.saveText(file, updated.toString())
-        }
+        if (current.contains(includeBuildLine)) return
+
+        val updated = StringBuilder(current)
+        if (updated.isNotEmpty() && !updated.endsWith("\n")) updated.appendLine()
+        updated.appendLine(includeBuildLine)
+        VfsUtil.saveText(file, updated.toString())
     }
 }

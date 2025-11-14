@@ -1,5 +1,5 @@
 plugins {
-    id("com.PACKAGE.convention.android.library.dataSource")
+    alias(libs.plugins.convention.android.library.dataSource)
 }
 
 android {

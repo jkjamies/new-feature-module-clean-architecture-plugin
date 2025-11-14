@@ -83,20 +83,33 @@ class FeatureModulesGenerator(private val project: Project) {
         val packageDirPath = srcMain.path + "/com/" + safeOrg.replace('.', '/') + "/convention"
         val pkgDir = VfsUtil.createDirectories(packageDirPath)
 
-        // Always include shared defaults
+        // local helper to inject helper import after package line when needed
+        fun injectHelperImport(src: String): String {
+            if (!src.contains("configureAndroidLibraryDefaults()") || src.contains("convention.helpers.configureAndroidLibraryDefaults")) return src
+            val regex = Regex("(?m)^package\\s+com\\.[^\\n]+\\n")
+            val match = regex.find(src) ?: return src
+            val insertAt = match.range.last + 1
+            return src.substring(0, insertAt) + "\nimport com.$safeOrg.convention.helpers.configureAndroidLibraryDefaults\n" + src.substring(insertAt)
+        }
+
+        // Always include shared defaults/helpers under helpers package
         val conventionFolderPath = "/templates/cleanArchitecture/buildLogic/conventionPlugins"
-        listOf("AndroidLibraryDefaults.kt").forEach { fname ->
-            val resPath = "$conventionFolderPath/$fname"
+        val helpersFolderPath = "$conventionFolderPath/helpers"
+        val helpersPkgDir = VfsUtil.createDirectories("$packageDirPath/helpers")
+        listOf("AndroidLibraryDefaults.kt", "TestOptions.kt", "StandardTestDependencies.kt").forEach { fname ->
+            val resPath = "$helpersFolderPath/$fname"
             val text = loadTemplateResource(resPath) ?: return@forEach
-            val replaced = applyPackagePlaceholder(text, safeOrg)
-            if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
+            // Rewrite package to com.<org>.convention.helpers
+            val rewritten = text.replaceFirst(Regex("(?m)^package\\s+.*$"), "package com.$safeOrg.convention.helpers")
+            if (helpersPkgDir.findChild(fname) == null) helpersPkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, rewritten) }
         }
         // Conditionally include convention plugins matching enabled modules
         if (enabledModules.contains("data")) {
             listOf("DataConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                val replaced = applyPackagePlaceholder(text, safeOrg)
+                var replaced = applyPackagePlaceholder(text, safeOrg)
+                replaced = injectHelperImport(replaced)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -106,7 +119,8 @@ class FeatureModulesGenerator(private val project: Project) {
             listOf("DIConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                val replaced = applyPackagePlaceholder(text, safeOrg)
+                var replaced = applyPackagePlaceholder(text, safeOrg)
+                replaced = injectHelperImport(replaced)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -116,7 +130,8 @@ class FeatureModulesGenerator(private val project: Project) {
             listOf("DomainConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                val replaced = applyPackagePlaceholder(text, safeOrg)
+                var replaced = applyPackagePlaceholder(text, safeOrg)
+                replaced = injectHelperImport(replaced)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -126,7 +141,8 @@ class FeatureModulesGenerator(private val project: Project) {
             listOf("PresentationConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                val replaced = applyPackagePlaceholder(text, safeOrg)
+                var replaced = applyPackagePlaceholder(text, safeOrg)
+                replaced = injectHelperImport(replaced)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -139,7 +155,8 @@ class FeatureModulesGenerator(private val project: Project) {
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: ""
                 if (text.isNotEmpty()) {
-                    val replaced = applyPackagePlaceholder(text, safeOrg)
+                    var replaced = applyPackagePlaceholder(text, safeOrg)
+                    replaced = injectHelperImport(replaced)
                     if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
             }
@@ -148,7 +165,8 @@ class FeatureModulesGenerator(private val project: Project) {
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: ""
                 if (text.isNotEmpty()) {
-                    val replaced = applyPackagePlaceholder(text, safeOrg)
+                    var replaced = applyPackagePlaceholder(text, safeOrg)
+                    replaced = injectHelperImport(replaced)
                     if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
             }
@@ -157,7 +175,8 @@ class FeatureModulesGenerator(private val project: Project) {
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: ""
                 if (text.isNotEmpty()) {
-                    val replaced = applyPackagePlaceholder(text, safeOrg)
+                    var replaced = applyPackagePlaceholder(text, safeOrg)
+                    replaced = injectHelperImport(replaced)
                     if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
             }
@@ -258,6 +277,9 @@ class FeatureModulesGenerator(private val project: Project) {
         // ensure settings includeBuild("build-logic") is present
         settingsUpdater.updateRootSettingsIncludeBuild(projectBasePath, "build-logic")
 
+        // ensure version catalog has plugin aliases for selected layers
+        ensureVersionCatalogPluginAliases(projectBasePath, orgSegment, enabledModules)
+
         // ensure the IDE reflects new directories/files
         featureVf.refresh(true, true)
 
@@ -265,6 +287,74 @@ class FeatureModulesGenerator(private val project: Project) {
             "No modules were created because all exist for feature '$featureName'. Modules ensured in settings.gradle."
         } else {
             "Created modules: ${created.joinToString()} under feature '$featureName' and updated settings.gradle."
+        }
+    }
+
+    private fun ensureVersionCatalogPluginAliases(projectBasePath: String, orgSegment: String, enabledModules: List<String>) {
+        val lfs = LocalFileSystem.getInstance()
+        val baseDir = lfs.refreshAndFindFileByPath(projectBasePath) ?: return
+        val gradleDir = VfsUtil.createDirectoryIfMissing(baseDir, "gradle") ?: return
+        val catalogFile = gradleDir.findChild("libs.versions.toml")
+        val safeOrg = orgSegment.trim().ifEmpty { "jkjamies" }
+        val requiredLayers = buildList {
+            add("domain")
+            add("data")
+            if (enabledModules.contains("di")) add("di")
+            if (enabledModules.contains("presentation")) add("presentation")
+            if (enabledModules.contains("dataSource")) add("dataSource")
+            if (enabledModules.contains("remoteDataSource")) add("remoteDataSource")
+            if (enabledModules.contains("localDataSource")) add("localDataSource")
+        }
+
+        if (catalogFile == null) {
+            val file = gradleDir.createChildData(this, "libs.versions.toml")
+            val sb = StringBuilder()
+            sb.appendLine("[versions]")
+            sb.appendLine()
+            sb.appendLine("[libraries]")
+            sb.appendLine()
+            sb.appendLine("[bundles]")
+            sb.appendLine()
+            sb.appendLine("[plugins]")
+            requiredLayers.forEach { layer ->
+                val alias = "convention-android-library-$layer"
+                val id = "com.$safeOrg.convention.android.library.$layer"
+                sb.appendLine("$alias = { id = \"$id\" }")
+            }
+            VfsUtil.saveText(file, sb.toString())
+            return
+        }
+
+        // Update existing catalog file idempotently
+        var text = VfsUtil.loadText(catalogFile)
+        // Ensure [plugins] section exists
+        if (!Regex("(?m)^\\[plugins]\\s*").containsMatchIn(text)) {
+            // append plugins section at end
+            if (!text.endsWith("\n")) text += "\n"
+            text += "\n[plugins]\n"
+        }
+        // Now ensure each alias line exists under [plugins]
+        val pluginsSectionRegex = Regex("(?s)\\[plugins]\\s*(.*?)(?:\\n\\[[^\\]]+]|$)")
+        val match = pluginsSectionRegex.find(text)
+        val pluginsBlock = match?.groups?.get(1)?.value ?: ""
+        val additions = StringBuilder()
+        requiredLayers.forEach { layer ->
+            val alias = "convention-android-library-$layer"
+            val id = "com.$safeOrg.convention.android.library.$layer"
+            // Check if alias already present
+            val aliasRegex = Regex("(?m)^\\s*${Regex.escape(alias)}\\s*=\\s*\\{.*\\}")
+            if (!aliasRegex.containsMatchIn(pluginsBlock)) {
+                additions.appendLine("$alias = { id = \"$id\" }")
+            }
+        }
+        if (additions.isNotEmpty()) {
+            // Insert additions right after [plugins] header or at end of its block
+            val updated = text.replace(pluginsSectionRegex) { mr ->
+                val existing = mr.groups[1]?.value ?: ""
+                val content = if (existing.isNotBlank() && !existing.endsWith("\n")) existing + "\n" else existing
+                "[plugins]\n" + content + additions.toString()
+            }
+            VfsUtil.saveText(catalogFile, updated)
         }
     }
 }

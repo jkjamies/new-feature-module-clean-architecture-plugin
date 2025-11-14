@@ -36,6 +36,30 @@ class FeatureModulesGeneratorTests : LightPlatformTestCase() {
             val line = "include(\":features:payments:$m\")"
             assertTrue("Missing include for $m", content.contains(line))
         }
+        // ensure includeBuild("build-logic") is present
+        assertTrue(content.contains("includeBuild(\"build-logic\")"))
+
+        // Verify module build.gradle.kts applies convention plugins via version catalog alias
+        listOf("domain", "data", "di", "presentation").forEach { m ->
+            val moduleDir = featureDir.findChild(m) ?: error("module $m not found")
+            val buildFile = moduleDir.findChild("build.gradle.kts") ?: error("build.gradle.kts missing for $m")
+            val buildText = VfsUtil.loadText(buildFile)
+            assertTrue("$m should use alias() for convention plugin", buildText.contains("alias(libs.plugins.convention.android.library.$m)"))
+        }
+
+        // Verify project version catalog is created with required sections and plugin aliases
+        val gradleDir = projectRootVf.findChild("gradle") ?: error("gradle dir not created")
+        val catalog = gradleDir.findChild("libs.versions.toml") ?: error("libs.versions.toml not created")
+        val catalogText = VfsUtil.loadText(catalog)
+        assertTrue(catalogText.contains("[versions]"))
+        assertTrue(catalogText.contains("[libraries]"))
+        assertTrue(catalogText.contains("[bundles]"))
+        assertTrue(catalogText.contains("[plugins]"))
+        // aliases for generated layers
+        listOf("domain","data","di","presentation").forEach { layer ->
+            assertTrue("Missing plugin alias for $layer", catalogText.contains("convention-android-library-$layer"))
+            assertTrue("Missing plugin id for $layer", catalogText.contains("id = \"com.jkjamies.convention.android.library.$layer\""))
+        }
     }
 
     fun testGenerateWithoutPresentationExcludesPresentationModule() {
