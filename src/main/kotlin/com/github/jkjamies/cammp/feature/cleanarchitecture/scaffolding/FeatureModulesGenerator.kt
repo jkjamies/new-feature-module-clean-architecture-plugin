@@ -83,15 +83,6 @@ class FeatureModulesGenerator(private val project: Project) {
         val packageDirPath = srcMain.path + "/com/" + safeOrg.replace('.', '/') + "/convention"
         val pkgDir = VfsUtil.createDirectories(packageDirPath)
 
-        // local helper to inject helper import after package line when needed
-        fun injectHelperImport(src: String): String {
-            if (!src.contains("configureAndroidLibraryDefaults()") || src.contains("convention.helpers.configureAndroidLibraryDefaults")) return src
-            val regex = Regex("(?m)^package\\s+com\\.[^\\n]+\\n")
-            val match = regex.find(src) ?: return src
-            val insertAt = match.range.last + 1
-            return src.substring(0, insertAt) + "\nimport com.$safeOrg.convention.helpers.configureAndroidLibraryDefaults\n" + src.substring(insertAt)
-        }
-
         // Always include shared defaults/helpers under helpers package
         val conventionFolderPath = "/templates/cleanArchitecture/buildLogic/conventionPlugins"
         val helpersFolderPath = "$conventionFolderPath/helpers"
@@ -108,8 +99,7 @@ class FeatureModulesGenerator(private val project: Project) {
             listOf("DataConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                var replaced = applyPackagePlaceholder(text, safeOrg)
-                replaced = injectHelperImport(replaced)
+                val replaced = applyPackagePlaceholder(text, safeOrg)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -119,8 +109,7 @@ class FeatureModulesGenerator(private val project: Project) {
             listOf("DIConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                var replaced = applyPackagePlaceholder(text, safeOrg)
-                replaced = injectHelperImport(replaced)
+                val replaced = applyPackagePlaceholder(text, safeOrg)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -130,8 +119,7 @@ class FeatureModulesGenerator(private val project: Project) {
             listOf("DomainConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                var replaced = applyPackagePlaceholder(text, safeOrg)
-                replaced = injectHelperImport(replaced)
+                val replaced = applyPackagePlaceholder(text, safeOrg)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -141,8 +129,7 @@ class FeatureModulesGenerator(private val project: Project) {
             listOf("PresentationConventionPlugin.kt").forEach { fname ->
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: return@forEach
-                var replaced = applyPackagePlaceholder(text, safeOrg)
-                replaced = injectHelperImport(replaced)
+                val replaced = applyPackagePlaceholder(text, safeOrg)
                 if (pkgDir.findChild(fname) == null) {
                     pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
@@ -155,8 +142,7 @@ class FeatureModulesGenerator(private val project: Project) {
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: ""
                 if (text.isNotEmpty()) {
-                    var replaced = applyPackagePlaceholder(text, safeOrg)
-                    replaced = injectHelperImport(replaced)
+                    val replaced = applyPackagePlaceholder(text, safeOrg)
                     if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
             }
@@ -165,8 +151,7 @@ class FeatureModulesGenerator(private val project: Project) {
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: ""
                 if (text.isNotEmpty()) {
-                    var replaced = applyPackagePlaceholder(text, safeOrg)
-                    replaced = injectHelperImport(replaced)
+                    val replaced = applyPackagePlaceholder(text, safeOrg)
                     if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
             }
@@ -175,8 +160,7 @@ class FeatureModulesGenerator(private val project: Project) {
                 val resPath = "$conventionFolderPath/$fname"
                 val text = loadTemplateResource(resPath) ?: ""
                 if (text.isNotEmpty()) {
-                    var replaced = applyPackagePlaceholder(text, safeOrg)
-                    replaced = injectHelperImport(replaced)
+                    val replaced = applyPackagePlaceholder(text, safeOrg)
                     if (pkgDir.findChild(fname) == null) pkgDir.createChildData(this, fname).let { VfsUtil.saveText(it, replaced) }
                 }
             }

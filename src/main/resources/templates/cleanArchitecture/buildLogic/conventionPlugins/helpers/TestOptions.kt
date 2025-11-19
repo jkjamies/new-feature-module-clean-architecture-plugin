@@ -1,4 +1,4 @@
-package templates.cleanArchitecture.buildLogic.conventionPlugins.helpers
+package com.${PACKAGE}.convention.helpers
 
 import com.android.build.api.dsl.LibraryExtension
 import org.gradle.api.Project
@@ -32,6 +32,8 @@ internal fun Project.configureUnitTesting() {
                     "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
                     "-Xmx4g"
                 )
+                // Enable Jacoco per test for coverage aggregation
+                test.extensions.extraProperties["jacoco"] = true
             }
         }
     }

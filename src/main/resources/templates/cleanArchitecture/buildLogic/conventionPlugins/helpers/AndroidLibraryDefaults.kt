@@ -1,4 +1,4 @@
-package templates.cleanArchitecture.buildLogic.conventionPlugins.helpers
+package com.${PACKAGE}.convention.helpers
 
 import com.android.build.api.dsl.LibraryExtension
 import org.gradle.api.Project
@@ -14,13 +14,23 @@ internal fun Project.configureAndroidLibraryDefaults() {
         val compileSdkProp = findProperty("compileSdk")?.toString()?.toIntOrNull() ?: 35
         val minSdkProp = findProperty("minSdk")?.toString()?.toIntOrNull() ?: 28
         val targetSdkProp = findProperty("targetSdk")?.toString()?.toIntOrNull() ?: compileSdkProp
+
         compileSdk = compileSdkProp
+
         defaultConfig {
             minSdk = minSdkProp
             targetSdk = targetSdkProp
             testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            // TODO: add additional optional build config
+        }
+
+        // Enable generation of BuildConfig for library modules (disabled by default in AGP for libraries)
+        buildFeatures {
+            buildConfig = true
         }
     }
+
+    // TODO: add build types, variant configs, etc
 
     // Tests
     configureUnitTesting()

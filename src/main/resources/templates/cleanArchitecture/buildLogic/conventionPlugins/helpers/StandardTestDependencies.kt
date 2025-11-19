@@ -1,4 +1,4 @@
-package templates.cleanArchitecture.buildLogic.conventionPlugins.helpers
+package com.${PACKAGE}.convention.helpers
 
 import org.gradle.api.Project
 import org.gradle.api.artifacts.VersionCatalogsExtension
@@ -13,6 +13,12 @@ internal fun Project.addStandardTestDependencies() {
 
     dependencies {
         catalogs.findLibrary("kotest-runner").ifPresent {
+            add("testImplementation", it)
+        }
+        catalogs.findLibrary("kotest-assertion").ifPresent {
+            add("testImplementation", it)
+        }
+        catalogs.findLibrary("kotest-property").ifPresent {
             add("testImplementation", it)
         }
         catalogs.findLibrary("junit-vintage-engine").ifPresent {
